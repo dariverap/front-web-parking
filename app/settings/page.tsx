@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Sidebar } from "@/components/sidebar"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -74,11 +73,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar userRole="admin_parking" />
-
-      <main className="flex-1 ml-0 md:ml-64 overflow-auto">
-        <div className="p-6 pt-16 md:pt-6">
+    <div className="p-6 pt-16 md:pt-6">
           <Breadcrumbs items={[{ label: "Configuración" }]} />
 
           <div className="space-y-6">
@@ -482,8 +477,6 @@ export default function SettingsPage() {
               </TabsContent>
             </Tabs>
           </div>
-        </div>
-      </main>
     </div>
   )
 }

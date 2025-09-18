@@ -1,6 +1,4 @@
 "use client"
-
-import { AuthGuard } from "@/components/auth-guard"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 import { MetricsCard } from "@/components/metrics-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -150,9 +148,5 @@ function DashboardContent() {
 }
 
 export default function Dashboard() {
-  return (
-    <AuthGuard>
-      <DashboardContent />
-    </AuthGuard>
-  )
+  return <DashboardContent />
 }

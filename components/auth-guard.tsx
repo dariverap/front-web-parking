@@ -23,26 +23,28 @@ let isInitialized = false
 
 export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const [user, setUser] = useState<User | null>(globalUser)
-  const [isLoading, setIsLoading] = useState(!isInitialized)
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   const pathname = usePathname()
 
   useEffect(() => {
+    // Rutas públicas de autenticación
     if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password") {
       setIsLoading(false)
       return
     }
 
     const init = async () => {
+      // No activar loading agresivo en cada navegación; usar usuario cacheado y refrescar en background
       try {
-        // If there is a token, try to fetch current user
+        // Si hay token, obtenemos/actualizamos el usuario
         const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
         if (!token) {
           router.replace("/login")
           return
         }
 
-        // Use cached user immediately to avoid flicker
+        // Usar usuario cacheado para evitar parpadeo
         let current = globalUser
         if (!current && typeof window !== "undefined") {
           const cached = localStorage.getItem("user")
@@ -50,12 +52,11 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
             try { current = JSON.parse(cached) } catch {}
           }
         }
+        if (current) setUser(current)
+        // Ya podemos dejar de mostrar loading si había cache
+        setIsLoading(false)
 
-        if (current) {
-          setUser(current)
-        }
-
-        // Refresh profile in background (non-blocking)
+        // Refrescar perfil
         try {
           const fresh = await getCurrentUser()
           current = fresh || current
@@ -69,7 +70,6 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
 
         // Bloquear cliente, bloqueado o eliminado
         if (current?.rol === "cliente" || (current as any)?.bloqueado === true || (current as any)?.deleted_at) {
-          // No access to web
           localStorage.removeItem("token")
           localStorage.removeItem("user")
           globalUser = null
@@ -93,16 +93,16 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
         return
       } finally {
         isInitialized = true
+        // Asegurar que loading esté desactivado tras la primera inicialización
         setIsLoading(false)
       }
     }
 
-    if (!isInitialized) {
-      void init()
-    }
+    // Ejecutar init en cada navegación a rutas protegidas
+    void init()
   }, [router, allowedRoles, pathname])
 
-  if (isLoading) {
+  if (isLoading || (!user && !(pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password"))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -113,9 +113,7 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     )
   }
 
-  if (!user && pathname !== "/login" && pathname !== "/register" && pathname !== "/forgot-password" && pathname !== "/reset-password") {
-    return null
-  }
+  // En rutas públicas simplemente renderizar children
 
   return <>{children}</>
 }
@@ -184,4 +182,3 @@ export function useAuth() {
 
   return { user, logout }
 }
-

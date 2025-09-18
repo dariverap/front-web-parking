@@ -30,11 +30,11 @@ export default function LoginPage() {
 
       // Redirección básica: al Home. Si más adelante se quiere por rol, se puede ajustar aquí
       if (user && (user.rol === "admin_general" || user.rol === "admin_parking" || user.rol === "empleado")) {
-        router.push("/")
+        router.replace("/")
       } else if (user && user.rol === "cliente") {
         setError("Tu rol (cliente) no tiene acceso a la web. Usa la app móvil.")
       } else {
-        router.push("/")
+        router.replace("/")
       }
     } catch (err: any) {
       const message = err?.response?.data?.message || "Error al iniciar sesión"
