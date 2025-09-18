@@ -7,7 +7,7 @@ import { AuthGuard } from "@/components/auth-guard"
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
-  const authRoutes = ["/login", "/register", "/forgot-password"]
+  const authRoutes = ["/login", "/register", "/forgot-password", "/reset-password"]
   const isAuthRoute = authRoutes.includes(pathname || "")
 
   if (isAuthRoute) {

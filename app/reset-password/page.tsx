@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -40,11 +40,6 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string>("")
   const [success, setSuccess] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
-
-  const urlDebug = useMemo(() => {
-    if (typeof window === "undefined") return ""
-    return window.location.href
-  }, [])
 
   useEffect(() => {
     // Intentar obtener access_token desde el hash
@@ -143,12 +138,7 @@ export default function ResetPasswordPage() {
             </Alert>
           )}
 
-          {/* Info de depuración opcional cuando no se detecta token */}
-          {!success && !accessToken && (
-            <div className="mb-4 p-3 text-xs rounded bg-muted text-muted-foreground break-all">
-              URL actual: {urlDebug}
-            </div>
-          )}
+          {/* Nota: evitamos mostrar la URL completa para prevenir errores de hidratación y exposición de tokens. */}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">

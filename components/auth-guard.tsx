@@ -28,7 +28,7 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const pathname = usePathname()
 
   useEffect(() => {
-    if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password") {
+    if (pathname === "/login" || pathname === "/register" || pathname === "/forgot-password" || pathname === "/reset-password") {
       setIsLoading(false)
       return
     }
@@ -113,7 +113,7 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     )
   }
 
-  if (!user && pathname !== "/login" && pathname !== "/register" && pathname !== "/forgot-password") {
+  if (!user && pathname !== "/login" && pathname !== "/register" && pathname !== "/forgot-password" && pathname !== "/reset-password") {
     return null
   }
 
