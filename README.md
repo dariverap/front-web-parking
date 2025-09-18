@@ -161,17 +161,7 @@ Los endpoints se construyen sobre `NEXT_PUBLIC_API_URL`.
 - **Errores de red/401:** Redirección a `/login` o notificación. Revisar interceptor y manejo de toasts.
 - **Estados vacíos:** Tablas/listas con placeholders y CTAs para crear registros.
 
-## Capturas y recursos visuales
-Puedes añadir capturas en `public/` y referenciarlas aquí:
-
-![Login](./public/placeholder.jpg)
-
-![Perfil/Usuario](./public/placeholder-user.jpg)
-
-![Logo](./public/placeholder-logo.png)
-
-Sugerencias de nombres: `public/screens/login.png`, `public/screens/dashboard.png`, `public/screens/employees.png`.
-
+    
 ## Arquitectura Frontend (alto nivel)
 ```mermaid
 graph TD
