@@ -27,6 +27,13 @@ export async function listParkingsByUser(userId: string): Promise<ParkingRecord[
   return Array.isArray(data) ? data : []
 }
 
+// List parkings where the given admin is the assigned admin (GET /parking/admin/:adminId)
+export async function listParkingsByAdmin(adminId: string): Promise<ParkingRecord[]> {
+  const res = await api.get(`/parking/admin/${adminId}`)
+  const data = res.data?.data ?? res.data
+  return Array.isArray(data) ? data : []
+}
+
 export async function getParkingById(id: number | string): Promise<ParkingRecord> {
   const res = await api.get(`/parking/${id}`)
   return res.data?.data ?? res.data

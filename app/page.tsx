@@ -24,21 +24,21 @@ function DashboardContent() {
     metrics = {
       parkings: { value: "12", description: "Total de estacionamientos" },
       occupancy: { value: "78%", description: "Promedio de ocupación" },
-      revenue: { value: "€24,580", description: "Ingresos del mes actual" },
+      revenue: { value: "S/. 24,580", description: "Ingresos del mes actual" },
       reservations: { value: "156", description: "Reservas para hoy" },
     }
   } else if (isEmpleado) {
     metrics = {
       parkings: { value: "1", description: "Mi estacionamiento" },
       occupancy: { value: "85%", description: "Ocupación actual" },
-      revenue: { value: "€1,240", description: "Cobros de hoy" },
+      revenue: { value: "S/. 1,240", description: "Cobros de hoy" },
       reservations: { value: "23", description: "Reservas pendientes" },
     }
   } else {
     metrics = {
       parkings: { value: (((user as any).parkings?.length || 0) as number).toString(), description: "Mis estacionamientos" },
       occupancy: { value: "82%", description: "Ocupación promedio" },
-      revenue: { value: "€2,140", description: "Mis ingresos del mes" },
+      revenue: { value: "S/. 2,140", description: "Mis ingresos del mes" },
       reservations: { value: "43", description: "Mis reservas hoy" },
     }
   }

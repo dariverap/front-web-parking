@@ -149,7 +149,7 @@ export function ParkingForm({ initialData = {}, onSubmit, onCancel, isEditing = 
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="hourlyRate">Tarifa por Hora (€) *</Label>
+              <Label htmlFor="hourlyRate">Tarifa por Hora (S/. ) *</Label>
               <Input
                 id="hourlyRate"
                 type="number"

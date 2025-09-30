@@ -190,7 +190,7 @@ export default function ParkingDetailPage() {
               />
               <MetricsCard
                 title="Ingresos Hoy"
-                value={`€${(parking.revenue * 0.1).toFixed(2)}`}
+                value={`S/. ${(parking.revenue * 0.1).toFixed(2)}`}
                 description="Ingresos del día"
                 icon={DollarSign}
                 trend={{ value: 12.3, isPositive: true }}
@@ -230,7 +230,7 @@ export default function ParkingDetailPage() {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Tarifa por Hora</p>
-                          <p className="font-medium">€{parking.hourlyRate}</p>
+                          <p className="font-medium">S/. {parking.hourlyRate}</p>
                         </div>
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">Ocupación Promedio</p>
@@ -318,7 +318,7 @@ export default function ParkingDetailPage() {
                               <TableCell>{reservation.startTime}</TableCell>
                               <TableCell>{reservation.endTime}</TableCell>
                               <TableCell>{getStatusBadge(reservation.status)}</TableCell>
-                              <TableCell>€{reservation.amount.toFixed(2)}</TableCell>
+                              <TableCell>S/. {reservation.amount.toFixed(2)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>

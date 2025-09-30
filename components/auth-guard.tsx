@@ -20,6 +20,10 @@ interface AuthGuardProps {
 
 let globalUser: User | null = null
 let isInitialized = false
+// Anti-spam para /auth/profile en dev: una sola petición en vuelo y TTL corto
+let isFetchingProfile = false
+let lastProfileFetchedAt = 0
+const PROFILE_TTL_MS = 20_000 // 20s
 
 export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
   const [user, setUser] = useState<User | null>(globalUser)
@@ -56,17 +60,27 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
         // Ya podemos dejar de mostrar loading si había cache
         setIsLoading(false)
 
-        // Refrescar perfil
+        // Refrescar perfil (throttle para evitar llamadas repetidas)
         try {
-          const fresh = await getCurrentUser()
-          current = fresh || current
-          globalUser = current
-          setUser(current)
-          if (typeof window !== "undefined" && current) {
-            localStorage.setItem("user", JSON.stringify(current))
-            window.dispatchEvent(new CustomEvent("auth:user", { detail: current }))
+          const now = Date.now()
+          const isFresh = now - lastProfileFetchedAt < PROFILE_TTL_MS
+          if (!isFetchingProfile && !isFresh) {
+            isFetchingProfile = true
+            const fresh = await getCurrentUser()
+            lastProfileFetchedAt = Date.now()
+            current = fresh || current
+            globalUser = current
+            setUser(current)
+            if (typeof window !== "undefined" && current) {
+              localStorage.setItem("user", JSON.stringify(current))
+              window.dispatchEvent(new CustomEvent("auth:user", { detail: current }))
+            }
           }
-        } catch (_) {}
+        } catch (_) {
+          // noop
+        } finally {
+          isFetchingProfile = false
+        }
 
         // Bloquear cliente, bloqueado o eliminado
         if (current?.rol === "cliente" || (current as any)?.bloqueado === true || (current as any)?.deleted_at) {

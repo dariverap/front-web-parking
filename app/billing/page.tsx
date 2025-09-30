@@ -300,7 +300,7 @@ function BillingPageContent() {
                   <DollarSign className="h-4 w-4 text-green-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-green-600">€{todayTotal.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-green-600">S/. {todayTotal.toFixed(2)}</div>
                   <p className="text-xs text-muted-foreground">Ingresos del día</p>
                 </CardContent>
               </Card>
@@ -362,8 +362,8 @@ function BillingPageContent() {
                           </TableCell>
                           <TableCell className="text-sm">{customer.entryTime}</TableCell>
                           <TableCell className="font-medium">{customer.duration}</TableCell>
-                          <TableCell>€{customer.rate}/h</TableCell>
-                          <TableCell className="font-bold text-green-600">€{customer.totalAmount}</TableCell>
+                          <TableCell>S/. {customer.rate}/h</TableCell>
+                          <TableCell className="font-bold text-green-600">S/. {customer.totalAmount}</TableCell>
                           <TableCell>{getStatusBadge(customer.status)}</TableCell>
                           <TableCell className="text-right">
                             <Button
@@ -415,7 +415,7 @@ function BillingPageContent() {
                           <TableCell className="text-sm">{transaction.customerName}</TableCell>
                           <TableCell className="text-sm">{transaction.duration}</TableCell>
                           <TableCell>{getPaymentMethodBadge(transaction.paymentMethod)}</TableCell>
-                          <TableCell className="font-bold text-green-600">€{transaction.amount}</TableCell>
+                          <TableCell className="font-bold text-green-600">S/. {transaction.amount}</TableCell>
                           <TableCell className="text-sm text-muted-foreground">{transaction.timestamp}</TableCell>
                           <TableCell className="text-sm">{transaction.employeeName}</TableCell>
                         </TableRow>
@@ -446,7 +446,7 @@ function BillingPageContent() {
               </div>
               <div>
                 <Label className="text-sm font-medium">Tarifa</Label>
-                <p className="text-lg">€{selectedCustomer?.rate}/hora</p>
+                <p className="text-lg">S/. {selectedCustomer?.rate}/hora</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -560,15 +560,15 @@ function BillingPageContent() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="hourly">Por Hora (€{rates.hourly})</SelectItem>
-                  <SelectItem value="daily">Por Día (€{rates.daily})</SelectItem>
+                  <SelectItem value="hourly">Por Hora (S/. {rates.hourly})</SelectItem>
+                  <SelectItem value="daily">Por Día (S/. {rates.daily})</SelectItem>
                   <SelectItem value="custom">Tarifa Personalizada</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {calculatorData.rateType === "custom" && (
               <div className="grid gap-2">
-                <Label htmlFor="customRate">Tarifa Personalizada (€/hora)</Label>
+                <Label htmlFor="customRate">Tarifa Personalizada (S/. /hora)</Label>
                 <Input
                   id="customRate"
                   type="number"
@@ -582,7 +582,7 @@ function BillingPageContent() {
             <div className="bg-muted p-4 rounded-lg">
               <div className="flex items-center justify-between">
                 <span className="font-medium">Total a Cobrar:</span>
-                <span className="text-2xl font-bold text-green-600">€{calculateAmount()}</span>
+                <span className="text-2xl font-bold text-green-600">S/. {calculateAmount()}</span>
               </div>
             </div>
           </div>
