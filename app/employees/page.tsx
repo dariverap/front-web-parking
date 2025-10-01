@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Edit, Trash2, UserCheck, Search, Phone } from "lucide-react"
+import { lettersOnly, digitsOnly, isValidName, isValidPhone } from "@/lib/validators"
 import { useAuth } from "@/components/auth-guard"
 import { listScopedEmployees, updateEmployee } from "@/lib/employees"
 import { createEmployee, deleteEmployee } from "@/lib/employees"
@@ -117,6 +118,13 @@ function EmployeesPageContent() {
     assignedParkings: [] as string[],
     // UI-only fields eliminados
   })
+
+  // Validaciones derivadas
+  const validName = isValidName(formData.name)
+  const validPhone = formData.phone === "" ? true : isValidPhone(formData.phone)
+  const validEmail = (formData.email || "").includes("@")
+  const canCreate = validName && validEmail && validPhone
+  const canEdit = validName && validEmail && validPhone
 
   const showSuccess = (title: string, desc?: string) => { setToastTitle(title); setToastDesc(desc || ""); setToastOpen(true) }
   const showError = (title: string, desc?: string) => { setToastTitle(title); setToastDesc(desc || ""); setToastOpen(true) }
@@ -408,9 +416,12 @@ function EmployeesPageContent() {
                         <Input
                           id="name"
                           value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          onChange={(e) => setFormData({ ...formData, name: lettersOnly(e.target.value) })}
                           placeholder="Nombre del empleado"
                         />
+                        {!validName && formData.name !== "" && (
+                          <p className="text-xs text-red-600">Solo letras y espacios (mín. 2 caracteres).</p>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="email">Email</Label>
@@ -421,6 +432,9 @@ function EmployeesPageContent() {
                           onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                           placeholder="empleado@email.com"
                         />
+                        {!validEmail && formData.email !== "" && (
+                          <p className="text-xs text-red-600">Ingrese un email válido.</p>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -429,9 +443,12 @@ function EmployeesPageContent() {
                         <Input
                           id="phone"
                           value={formData.phone}
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                          onChange={(e) => setFormData({ ...formData, phone: digitsOnly(e.target.value) })}
                           placeholder="+34 666 123 456"
                         />
+                        {!validPhone && formData.phone !== "" && (
+                          <p className="text-xs text-red-600">Ingrese solo números (6 a 15 dígitos).</p>
+                        )}
                       </div>
                       {/* Campos UI no persistentes (puesto, turno, salario, fecha) eliminados */}
                     <div className="grid gap-2">
@@ -457,7 +474,7 @@ function EmployeesPageContent() {
                     <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700" disabled={!canCreate}>
                       Crear Empleado
                     </Button>
                   </DialogFooter>
@@ -596,8 +613,11 @@ function EmployeesPageContent() {
                 <Input
                   id="edit-name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, name: lettersOnly(e.target.value) })}
                 />
+                {!validName && formData.name !== "" && (
+                  <p className="text-xs text-red-600">Solo letras y espacios (mín. 2 caracteres).</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-email">Email</Label>
@@ -607,6 +627,9 @@ function EmployeesPageContent() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
+                {!validEmail && formData.email !== "" && (
+                  <p className="text-xs text-red-600">Ingrese un email válido.</p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -615,8 +638,11 @@ function EmployeesPageContent() {
                 <Input
                   id="edit-phone"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, phone: digitsOnly(e.target.value) })}
                 />
+                {!validPhone && formData.phone !== "" && (
+                  <p className="text-xs text-red-600">Ingrese solo números (6 a 15 dígitos).</p>
+                )}
               </div>
             </div>
             {user?.rol === "admin_general" && (
@@ -644,7 +670,7 @@ function EmployeesPageContent() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEdit}>Guardar Cambios</Button>
+            <Button onClick={handleEdit} disabled={!canEdit}>Guardar Cambios</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

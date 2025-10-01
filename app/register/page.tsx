@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Car, Eye, EyeOff, ArrowLeft } from "lucide-react"
 import { register as registerApi } from "@/lib/auth"
+import { lettersOnly, digitsOnly, isValidName, isValidPhone, isValidEmail } from "@/lib/validators"
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -31,8 +32,22 @@ export default function RegisterPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
+    // Sanitizar según campo
+    if (name === 'nombre' || name === 'apellido') {
+      setFormData((prev) => ({ ...prev, [name]: lettersOnly(value) }))
+    } else if (name === 'telefono') {
+      setFormData((prev) => ({ ...prev, [name]: digitsOnly(value) }))
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }))
+    }
   }
+
+  // Validaciones derivadas (front)
+  const validNombre = isValidName(formData.nombre)
+  const validApellido = isValidName(formData.apellido)
+  const validTelefono = formData.telefono === '' ? true : isValidPhone(formData.telefono)
+  const validEmail = isValidEmail(formData.email)
+  const canSubmit = validNombre && validApellido && validTelefono && validEmail && formData.password.length >= 6 && formData.password === formData.confirmPassword
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,6 +56,26 @@ export default function RegisterPage() {
     setSuccess("")
 
     // Validation
+    if (!validNombre) {
+      setError("Nombre inválido: solo letras y espacios, mínimo 2 caracteres")
+      setIsLoading(false)
+      return
+    }
+    if (!validApellido) {
+      setError("Apellido inválido: solo letras y espacios, mínimo 2 caracteres")
+      setIsLoading(false)
+      return
+    }
+    if (!validEmail) {
+      setError("Email inválido")
+      setIsLoading(false)
+      return
+    }
+    if (!validTelefono) {
+      setError("Teléfono inválido: solo números (6 a 15 dígitos)")
+      setIsLoading(false)
+      return
+    }
     if (formData.password !== formData.confirmPassword) {
       setError("Las contraseñas no coinciden")
       setIsLoading(false)
@@ -93,6 +128,9 @@ export default function RegisterPage() {
                   onChange={handleInputChange}
                   required
                 />
+                {!validNombre && formData.nombre !== '' && (
+                  <p className="text-xs text-red-600">Solo letras y espacios (mín. 2 caracteres).</p>
+                )}
                 <Input
                   id="apellido"
                   name="apellido"
@@ -102,6 +140,9 @@ export default function RegisterPage() {
                   onChange={handleInputChange}
                   required
                 />
+                {!validApellido && formData.apellido !== '' && (
+                  <p className="text-xs text-red-600">Solo letras y espacios (mín. 2 caracteres).</p>
+                )}
               </div>
             </div>
 
@@ -116,6 +157,9 @@ export default function RegisterPage() {
                 onChange={handleInputChange}
                 required
               />
+              {!validEmail && formData.email !== '' && (
+                <p className="text-xs text-red-600">Ingrese un email válido.</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -129,6 +173,9 @@ export default function RegisterPage() {
                 onChange={handleInputChange}
                 required
               />
+              {!validTelefono && formData.telefono !== '' && (
+                <p className="text-xs text-red-600">Ingrese solo números (6 a 15 dígitos).</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -191,7 +238,7 @@ export default function RegisterPage() {
               </Alert>
             )}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || !canSubmit}>
               {isLoading ? "Creando cuenta..." : "Crear Cuenta"}
             </Button>
           </form>

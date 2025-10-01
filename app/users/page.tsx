@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, Edit, Trash2, Users, Shield, UserCheck, Search } from "lucide-react"
 import { listUsers, toggleBlockUser, deleteUser, getUserParkings, assignParkingsToUser, removeParkingFromUser, type UserRecord, updateUser, type ParkingAssignment } from "@/lib/users"
+import { lettersOnly, digitsOnly, isValidName, isValidPhone, isValidEmail } from "@/lib/validators"
 import { listAllParkings, type ParkingRecord } from "@/lib/parkings"
 import { register } from "@/lib/auth"
 
@@ -57,6 +58,13 @@ function UsersPageContent() {
   const [parkings, setParkings] = useState<ParkingRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string|undefined>(undefined)
+
+  // Derived validations
+  const validName = isValidName(formData.name)
+  const validPhone = formData.phone === "" ? true : isValidPhone(formData.phone)
+  const validEmail = isValidEmail(formData.email)
+  const canCreate = validName && validEmail && validPhone && !!formData.role
+  const canEdit = validName && validEmail && validPhone && !!formData.role
 
   // Cargar usuarios y parkings
   useEffect(() => {
@@ -379,9 +387,12 @@ function UsersPageContent() {
                       <Input
                         id="name"
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, name: lettersOnly(e.target.value) })}
                         placeholder="Nombre del usuario"
                       />
+                      {!validName && formData.name !== "" && (
+                        <p className="text-xs text-red-600">Solo letras y espacios (mín. 2 caracteres).</p>
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="email">Email</Label>
@@ -392,15 +403,21 @@ function UsersPageContent() {
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="usuario@email.com"
                       />
+                      {!validEmail && formData.email !== "" && (
+                        <p className="text-xs text-red-600">Ingrese un email válido.</p>
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="phone">Teléfono</Label>
                       <Input
                         id="phone"
                         value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, phone: digitsOnly(e.target.value) })}
                         placeholder="+34 666 123 456"
                       />
+                      {!validPhone && formData.phone !== "" && (
+                        <p className="text-xs text-red-600">Ingrese solo números (6 a 15 dígitos).</p>
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="role">Rol</Label>
@@ -438,7 +455,7 @@ function UsersPageContent() {
                     <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreate}>Crear Usuario</Button>
+                    <Button onClick={handleCreate} disabled={!canCreate}>Crear Usuario</Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -646,8 +663,11 @@ function UsersPageContent() {
               <Input
                 id="edit-name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, name: lettersOnly(e.target.value) })}
               />
+              {!validName && formData.name !== "" && (
+                <p className="text-xs text-red-600">Solo letras y espacios (mín. 2 caracteres).</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-email">Email</Label>
@@ -657,14 +677,20 @@ function UsersPageContent() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               />
+              {!validEmail && formData.email !== "" && (
+                <p className="text-xs text-red-600">Ingrese un email válido.</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-phone">Teléfono</Label>
               <Input
                 id="edit-phone"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, phone: digitsOnly(e.target.value) })}
               />
+              {!validPhone && formData.phone !== "" && (
+                <p className="text-xs text-red-600">Ingrese solo números (6 a 15 dígitos).</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-role">Rol</Label>
@@ -715,7 +741,7 @@ function UsersPageContent() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEdit}>Guardar Cambios</Button>
+            <Button onClick={handleEdit} disabled={!canEdit}>Guardar Cambios</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

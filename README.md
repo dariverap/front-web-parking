@@ -2,11 +2,17 @@
 
 Aplicación frontend para la gestión de un sistema de estacionamiento (parking), construida con Next.js 14, React 18, Tailwind CSS y la librería de componentes basada en Radix UI.
 
+Este frontend forma parte del proyecto general "Parking System" y se integra con la API Node/Express ubicada en `../api-nodejs-parking`. La comunicación se realiza vía HTTP usando `NEXT_PUBLIC_API_URL`.
+
 ## Características
 - Autenticación con token (guardado en `localStorage`).
 - Consumo de API centralizado con Axios (`lib/api.ts`).
 - UI moderna con componentes reutilizables (`components/`).
 - Soporte de temas (dark/light) y diseño responsivo.
+
+- Selector de mapa para parkings (MapPicker): en `app/parkings/page.tsx`, al crear/editar un parking, se puede elegir el punto en un mapa (Leaflet + OpenStreetMap) o usar la ubicación actual del navegador. Las coordenadas (`latitud`, `longitud`) se rellenan automáticamente.
+- Validaciones y sanitización en formularios: se usan utilidades compartidas en `lib/validators.ts` para restringir campos (solo letras para nombres, solo números para teléfonos/DNI, decimales con 2 dígitos, rangos de lat/lng, etc.).
+- Filtrado visual por rol: para usuarios `admin_parking`, las vistas solo muestran parkings asignados (el backend también valida permisos con middleware, pero aquí se aplica una restricción UI adicional).
 
 ## Tech Stack
 - Next.js 14
@@ -14,7 +20,7 @@ Aplicación frontend para la gestión de un sistema de estacionamiento (parking)
 - Tailwind CSS 4
 - Radix UI / shadcn-ui (componentes)
 - Axios
-- Zod (validaciones)
+- Zod (validaciones internas de Next) + validadores propios (`lib/validators.ts`)
 
 ## Requisitos
 - Node.js >= 18
@@ -45,12 +51,14 @@ app/
   login/
   forgot-password/
   employees/
+  parkings/
   billing/
 components/
   ui/
 lib/
   api.ts
   auth.ts
+  validators.ts
   employees.ts
   parkings.ts
 styles/
@@ -77,6 +85,15 @@ styles/
    ```
 
 La app estará disponible por defecto en `http://localhost:3000`.
+
+### Configuración de API
+- Define `NEXT_PUBLIC_API_URL` apuntando al backend. Ejemplo: `http://localhost:3001/api` si tu API corre en 3001.
+- El cliente HTTP (`lib/api.ts`) añade el token a `Authorization` si existe en `localStorage`.
+
+### Roles y comportamiento UI
+- `admin_general`: acceso completo a vistas y acciones.
+- `admin_parking`: ve y gestiona únicamente parkings asignados (UI filtrada + middleware backend).
+- `empleado`/`cliente`: vistas limitadas según permisos.
 
 ## Construcción y producción
 ```bash
@@ -145,6 +162,17 @@ flowchart LR
 ```
 
 El token se inyecta automáticamente en cada request por el interceptor Axios (`lib/api.ts`).
+
+## Arquitectura del proyecto (relación con API)
+```mermaid
+graph TD
+  A[Front Next.js] -->|HTTP| B[API Node/Express]
+  B --> C[Supabase/Postgres]
+```
+
+## Funcionalidades destacadas
+- **MapPicker**: `app/parkings/page.tsx` incluye un mapa interactivo (Leaflet via CDN) que permite hacer clic para fijar coordenadas y sincroniza con los inputs. La opción "Usar mi ubicación" permanece disponible.
+- **Validadores compartidos**: `lib/validators.ts` provee `lettersOnly`, `digitsOnly`, `decimal2`, `isValidName`, `isValidPhone`, `isValidEmail`. Se usan en Parkings, Users, Employees y Register.
 
 ## Endpoints de ejemplo (backend esperado)
 Los endpoints se construyen sobre `NEXT_PUBLIC_API_URL`.

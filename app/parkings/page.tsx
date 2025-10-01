@@ -67,6 +67,151 @@ export default function ParkingsPage() {
     lng: "",
   })
 
+  // Helpers de validación y sanitización (solo front)
+  const lettersOnly = (v: string) => v.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ\s]/g, "")
+  const digitsOnly = (v: string) => v.replace(/[^0-9]/g, "")
+  const decimal2 = (v: string) => {
+    // permitir solo 0-9 y un punto, y máximo 2 decimales
+    let s = v.replace(/[^0-9.]/g, "")
+    const parts = s.split(".")
+    if (parts.length > 2) {
+      s = parts[0] + "." + parts.slice(1).join("")
+    }
+    const [intp, decp = ""] = s.split(".")
+    return decp ? `${intp}.${decp.slice(0, 2)}` : intp
+  }
+  const isNumber = (v: string) => v !== "" && !Number.isNaN(Number(v))
+  const inRange = (n: number, min: number, max: number) => n >= min && n <= max
+
+  // Validaciones derivadas
+  const validName = formData.name.trim().length >= 2 && /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(formData.name)
+  const validTotal = isNumber(formData.totalSpaces) && Number(formData.totalSpaces) > 0
+  const validRate = isNumber(formData.hourlyRate) && Number(formData.hourlyRate) >= 0
+  const validLat = isNumber(formData.lat) && inRange(Number(formData.lat), -90, 90)
+  const validLng = isNumber(formData.lng) && inRange(Number(formData.lng), -180, 180)
+  const validCoords = validLat && validLng
+  const canCreate = validName && validTotal && validRate && validCoords && !!formData.address.trim()
+  const canEdit = (validName || formData.name.trim().length > 0) && (formData.totalSpaces === "" || validTotal) && (formData.hourlyRate === "" || validRate) && (!formData.lat && !formData.lng ? true : validCoords)
+
+  // MapPicker: componente interno que carga Leaflet por CDN y permite elegir coordenadas clickeando el mapa
+  function MapPicker({
+    lat,
+    lng,
+    onChange,
+    height = 300,
+  }: { lat?: string | number; lng?: string | number; onChange: (lat: number, lng: number) => void; height?: number }) {
+    const mapRef = useRef<HTMLDivElement | null>(null)
+    const mapInstanceRef = useRef<any>(null)
+    const markerRef = useRef<any>(null)
+
+    // Utilidades para cargar CSS/JS de Leaflet solo una vez
+    const ensureLeafletLoaded = async () => {
+      const win = window as any
+      if (win.L) return
+      // Cargar CSS
+      if (!document.getElementById('leaflet-css')) {
+        const link = document.createElement('link')
+        link.id = 'leaflet-css'
+        link.rel = 'stylesheet'
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+        link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY='
+        link.crossOrigin = ''
+        document.head.appendChild(link)
+      }
+      // Cargar JS
+      await new Promise<void>((resolve, reject) => {
+        if (win.L) return resolve()
+        const scriptId = 'leaflet-js'
+        const existing = document.getElementById(scriptId) as HTMLScriptElement | null
+        if (existing) {
+          existing.addEventListener('load', () => resolve(), { once: true })
+          existing.addEventListener('error', () => reject(new Error('Leaflet load error')), { once: true })
+          // Si ya cargó previamente
+          if ((existing as any)._loaded) return resolve()
+          return
+        }
+        const script = document.createElement('script')
+        script.id = scriptId
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+        script.integrity = 'sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo='
+        script.crossOrigin = ''
+        script.async = true
+        ;(script as any)._loaded = false
+        script.onload = () => { (script as any)._loaded = true; resolve() }
+        script.onerror = () => reject(new Error('Leaflet load error'))
+        document.body.appendChild(script)
+      })
+    }
+
+    // Inicializar mapa una vez
+    useEffect(() => {
+      let destroyed = false
+      const init = async () => {
+        if (!mapRef.current) return
+        await ensureLeafletLoaded()
+        if (destroyed) return
+        const win = window as any
+        const L = win.L
+        const startLat = typeof lat === 'string' ? parseFloat(lat) : typeof lat === 'number' ? lat : -12.0464 // Lima
+        const startLng = typeof lng === 'string' ? parseFloat(lng) : typeof lng === 'number' ? lng : -77.0428
+        const map = L.map(mapRef.current).setView([startLat, startLng], 13)
+        mapInstanceRef.current = map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors',
+        }).addTo(map)
+        // Marcador inicial si hay coords
+        if (!isNaN(startLat) && !isNaN(startLng)) {
+          markerRef.current = L.marker([startLat, startLng], { draggable: false }).addTo(map)
+        }
+        // Click para seleccionar
+        map.on('click', (e: any) => {
+          const { lat: clat, lng: clng } = e.latlng
+          if (!markerRef.current) {
+            markerRef.current = L.marker([clat, clng], { draggable: false }).addTo(map)
+          } else {
+            markerRef.current.setLatLng([clat, clng])
+          }
+          onChange(clat, clng)
+        })
+      }
+      void init()
+      return () => {
+        destroyed = true
+        try {
+          if (mapInstanceRef.current) {
+            mapInstanceRef.current.remove()
+            mapInstanceRef.current = null
+          }
+        } catch {}
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Cuando cambian props lat/lng, actualizar marcador y centrar suavemente
+    useEffect(() => {
+      const L = (window as any).L
+      const map = mapInstanceRef.current
+      if (!L || !map) return
+      const nlat = typeof lat === 'string' ? parseFloat(lat) : (lat as number)
+      const nlng = typeof lng === 'string' ? parseFloat(lng) : (lng as number)
+      if (isNaN(nlat) || isNaN(nlng)) return
+      if (!markerRef.current) {
+        markerRef.current = L.marker([nlat, nlng], { draggable: false }).addTo(map)
+      } else {
+        markerRef.current.setLatLng([nlat, nlng])
+      }
+      map.setView([nlat, nlng], Math.max(map.getZoom(), 13))
+    }, [lat, lng])
+
+    return (
+      <div className="rounded-md overflow-hidden border">
+        <div ref={mapRef} style={{ width: '100%', height }} />
+        <div className="px-3 py-2 text-xs text-muted-foreground">Haz click en el mapa para seleccionar coordenadas</div>
+      </div>
+    )
+  }
+
   // Load data from API (evita doble llamada en modo dev por Strict Mode usando una clave)
   const lastFetchKeyRef = useRef<string | null>(null)
   useEffect(() => {
@@ -328,9 +473,12 @@ export default function ParkingsPage() {
                       <Input
                         id="name"
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) => setFormData({ ...formData, name: lettersOnly(e.target.value) })}
                         placeholder="Nombre del parking"
                       />
+                      {!validName && formData.name !== "" && (
+                        <p className="text-xs text-red-600">Solo letras y espacios (mín. 2 caracteres).</p>
+                      )}
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="address">Dirección</Label>
@@ -348,9 +496,12 @@ export default function ParkingsPage() {
                           id="totalSpaces"
                           type="number"
                           value={formData.totalSpaces}
-                          onChange={(e) => setFormData({ ...formData, totalSpaces: e.target.value })}
+                          onChange={(e) => setFormData({ ...formData, totalSpaces: digitsOnly(e.target.value) })}
                           placeholder="150"
                         />
+                        {!validTotal && formData.totalSpaces !== "" && (
+                          <p className="text-xs text-red-600">Ingrese un número entero mayor a 0.</p>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="hourlyRate">Tarifa/Hora (S/. )</Label>
@@ -359,9 +510,12 @@ export default function ParkingsPage() {
                           type="number"
                           step="0.1"
                           value={formData.hourlyRate}
-                          onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                          onChange={(e) => setFormData({ ...formData, hourlyRate: decimal2(e.target.value) })}
                           placeholder="2.50"
                         />
+                        {!validRate && formData.hourlyRate !== "" && (
+                          <p className="text-xs text-red-600">Número válido con hasta 2 decimales.</p>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -374,6 +528,9 @@ export default function ParkingsPage() {
                           onChange={(e) => setFormData({ ...formData, lat: e.target.value })}
                           placeholder="Ej: -12.0464"
                         />
+                        {!validLat && formData.lat !== "" && (
+                          <p className="text-xs text-red-600">Latitud entre -90 y 90.</p>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="lng">Longitud</Label>
@@ -384,6 +541,9 @@ export default function ParkingsPage() {
                           onChange={(e) => setFormData({ ...formData, lng: e.target.value })}
                           placeholder="Ej: -77.0428"
                         />
+                        {!validLng && formData.lng !== "" && (
+                          <p className="text-xs text-red-600">Longitud entre -180 y 180.</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
@@ -403,18 +563,12 @@ export default function ParkingsPage() {
                         Usar mi ubicación
                       </Button>
                     </div>
-                    {(formData.lat && formData.lng) && (
-                      <div className="rounded-md overflow-hidden border">
-                        <iframe
-                          title="Ubicación del parking"
-                          className="w-full h-48"
-                          src={`https://www.openstreetmap.org/export/embed.html?&marker=${encodeURIComponent(formData.lat)},${encodeURIComponent(formData.lng)}`}
-                        />
-                        <div className="px-3 py-2 text-xs text-muted-foreground">
-                          Vista previa del mapa (OpenStreetMap)
-                        </div>
-                      </div>
-                    )}
+                    <MapPicker
+                      lat={formData.lat}
+                      lng={formData.lng}
+                      onChange={(clat, clng) => setFormData((prev) => ({ ...prev, lat: String(clat), lng: String(clng) }))}
+                      height={300}
+                    />
                     {user?.rol === "admin_general" && (
                       <div className="grid gap-2">
                         <Label>Administrador Asignado</Label>
@@ -437,7 +591,7 @@ export default function ParkingsPage() {
                     <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700">
+                    <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700" disabled={!canCreate}>
                       Crear Parking
                     </Button>
                   </DialogFooter>
@@ -594,8 +748,11 @@ export default function ParkingsPage() {
                   id="edit-totalSpaces"
                   type="number"
                   value={formData.totalSpaces}
-                  onChange={(e) => setFormData({ ...formData, totalSpaces: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, totalSpaces: digitsOnly(e.target.value) })}
                 />
+                {!validTotal && formData.totalSpaces !== "" && (
+                  <p className="text-xs text-red-600">Ingrese un número entero mayor a 0.</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-hourlyRate">Tarifa/Hora (S/. )</Label>
@@ -604,8 +761,11 @@ export default function ParkingsPage() {
                   type="number"
                   step="0.1"
                   value={formData.hourlyRate}
-                  onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, hourlyRate: decimal2(e.target.value) })}
                 />
+                {!validRate && formData.hourlyRate !== "" && (
+                  <p className="text-xs text-red-600">Número válido con hasta 2 decimales.</p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -617,6 +777,9 @@ export default function ParkingsPage() {
                   value={formData.lat}
                   onChange={(e) => setFormData({ ...formData, lat: e.target.value })}
                 />
+                {!validLat && formData.lat !== "" && (
+                  <p className="text-xs text-red-600">Latitud entre -90 y 90.</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-lng">Longitud</Label>
@@ -626,6 +789,9 @@ export default function ParkingsPage() {
                   value={formData.lng}
                   onChange={(e) => setFormData({ ...formData, lng: e.target.value })}
                 />
+                {!validLng && formData.lng !== "" && (
+                  <p className="text-xs text-red-600">Longitud entre -180 y 180.</p>
+                )}
               </div>
             </div>
             <div className="flex items-center justify-between">
@@ -645,16 +811,12 @@ export default function ParkingsPage() {
                 Usar mi ubicación
               </Button>
             </div>
-            {(formData.lat && formData.lng) && (
-              <div className="rounded-md overflow-hidden border">
-                <iframe
-                  title="Ubicación del parking (edición)"
-                  className="w-full h-48"
-                  src={`https://www.openstreetmap.org/export/embed.html?&marker=${encodeURIComponent(formData.lat)},${encodeURIComponent(formData.lng)}`}
-                />
-                <div className="px-3 py-2 text-xs text-muted-foreground">Vista previa del mapa</div>
-              </div>
-            )}
+            <MapPicker
+              lat={formData.lat}
+              lng={formData.lng}
+              onChange={(clat, clng) => setFormData((prev) => ({ ...prev, lat: String(clat), lng: String(clng) }))}
+              height={300}
+            />
             {user?.rol === "admin_general" && (
               <div className="grid gap-2">
                 <Label>Administrador Asignado</Label>
@@ -677,7 +839,7 @@ export default function ParkingsPage() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEdit}>Guardar Cambios</Button>
+            <Button onClick={handleEdit} disabled={!canEdit}>Guardar Cambios</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
