@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -15,8 +17,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Edit, Trash2, Eye, MapPin, Car, DollarSign } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -52,46 +52,76 @@ export default function ParkingsPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [opMessage, setOpMessage] = useState<string>("")
   const [opType, setOpType] = useState<"success" | "error" | "">("")
+
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
-  const [viewParking, setViewParking] = useState<any>(null)
   const [viewLoading, setViewLoading] = useState(false)
   const [viewError, setViewError] = useState<string>("")
+  const [viewParking, setViewParking] = useState<any>(null)
+
   const [selectedParking, setSelectedParking] = useState<any>(null)
-  const [formData, setFormData] = useState({
-    name: "",
-    address: "",
-    totalSpaces: "",
-    hourlyRate: "",
-    adminId: "",
-    lat: "",
-    lng: "",
-  })
 
-  // Helpers de validación y sanitización (solo front)
-  const lettersOnly = (v: string) => v.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ\s]/g, "")
-  const digitsOnly = (v: string) => v.replace(/[^0-9]/g, "")
-  const decimal2 = (v: string) => {
-    // permitir solo 0-9 y un punto, y máximo 2 decimales
-    let s = v.replace(/[^0-9.]/g, "")
-    const parts = s.split(".")
-    if (parts.length > 2) {
-      s = parts[0] + "." + parts.slice(1).join("")
+  // Función para manejar cierre del diálogo con confirmación
+  const handleDialogClose = (open: boolean) => {
+    if (!open && hasUnsavedChanges()) {
+      const confirmClose = window.confirm("¿Estás seguro de que quieres cerrar? Se perderán los cambios no guardados.")
+      if (!confirmClose) return false
     }
-    const [intp, decp = ""] = s.split(".")
-    return decp ? `${intp}.${decp.slice(0, 2)}` : intp
+    setIsCreateDialogOpen(open)
+    return true
   }
-  const isNumber = (v: string) => v !== "" && !Number.isNaN(Number(v))
-  const inRange = (n: number, min: number, max: number) => n >= min && n <= max
 
-  // Validaciones derivadas
-  const validName = formData.name.trim().length >= 2 && /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(formData.name)
-  const validTotal = isNumber(formData.totalSpaces) && Number(formData.totalSpaces) > 0
-  const validRate = isNumber(formData.hourlyRate) && Number(formData.hourlyRate) >= 0
-  const validLat = isNumber(formData.lat) && inRange(Number(formData.lat), -90, 90)
-  const validLng = isNumber(formData.lng) && inRange(Number(formData.lng), -180, 180)
-  const validCoords = validLat && validLng
-  const canCreate = validName && validTotal && validRate && validCoords && !!formData.address.trim()
-  const canEdit = (validName || formData.name.trim().length > 0) && (formData.totalSpaces === "" || validTotal) && (formData.hourlyRate === "" || validRate) && (!formData.lat && !formData.lng ? true : validCoords)
+  // Función para verificar si hay cambios no guardados
+  const hasUnsavedChanges = () => {
+    return JSON.stringify(formData) !== JSON.stringify(initialFormData)
+  }
+
+const [formData, setFormData] = useState({
+  name: "",
+  address: "",
+  totalSpaces: "",
+  hourlyRate: "",
+  adminId: "",
+  lat: "-11.985608",
+  lng: "-77.07203",
+})
+
+// Estado inicial para comparar cambios
+const initialFormData = {
+  name: "",
+  address: "",
+  totalSpaces: "",
+  hourlyRate: "",
+  adminId: "",
+  lat: "-11.985608",
+  lng: "-77.07203",
+}
+
+// Funciones de validación
+const lettersOnly = (v: string) => v.replace(/[^A-Za-zÁÉÍÓÚáéíóúÑñ\s]/g, "")
+const digitsOnly = (v: string) => v.replace(/[^0-9]/g, "")
+const decimal2 = (v: string) => {
+  // permitir solo 0-9 y un punto, y máximo 2 decimales
+  let s = v.replace(/[^0-9.]/g, "")
+  const parts = s.split(".")
+  if (parts.length > 2) {
+    s = parts[0] + "." + parts.slice(1).join("")
+  }
+  const [intp, decp = ""] = s.split(".")
+  return decp ? `${intp}.${decp.slice(0, 2)}` : intp
+}
+const isNumber = (v: string) => v !== "" && !Number.isNaN(Number(v))
+const inRange = (n: number, min: number, max: number) => n >= min && n <= max
+
+// Validaciones derivadas
+const validName = formData.name.trim().length >= 2 && /^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/.test(formData.name)
+const validTotal = isNumber(formData.totalSpaces) && Number(formData.totalSpaces) > 0
+const validLat = isNumber(formData.lat) && inRange(Number(formData.lat), -90, 90)
+const validLng = isNumber(formData.lng) && inRange(Number(formData.lng), -180, 180)
+const validCoords = validLat && validLng
+const canCreate = validName && validTotal && validCoords && !!formData.address.trim()
+const canEdit = (validName || formData.name.trim().length > 0) && 
+  (formData.totalSpaces === "" || validTotal) && 
+  (!formData.lat && !formData.lng ? true : validCoords)
 
   // MapPicker: componente interno que carga Leaflet por CDN y permite elegir coordenadas clickeando el mapa
   function MapPicker({
@@ -152,8 +182,8 @@ export default function ParkingsPage() {
         if (destroyed) return
         const win = window as any
         const L = win.L
-        const startLat = typeof lat === 'string' ? parseFloat(lat) : typeof lat === 'number' ? lat : -12.0464 // Lima
-        const startLng = typeof lng === 'string' ? parseFloat(lng) : typeof lng === 'number' ? lng : -77.0428
+        const startLat = typeof lat === 'string' ? parseFloat(lat) : typeof lat === 'number' ? lat : -11.985608 // Los Olivos, Peru (UTP sede Lima Norte)
+        const startLng = typeof lng === 'string' ? parseFloat(lng) : typeof lng === 'number' ? lng : -77.07203
         const map = L.map(mapRef.current).setView([startLat, startLng], 13)
         mapInstanceRef.current = map
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -162,13 +192,21 @@ export default function ParkingsPage() {
         }).addTo(map)
         // Marcador inicial si hay coords
         if (!isNaN(startLat) && !isNaN(startLng)) {
-          markerRef.current = L.marker([startLat, startLng], { draggable: false }).addTo(map)
+          markerRef.current = L.marker([startLat, startLng], { draggable: true }).addTo(map)
+          markerRef.current.on('dragend', (e: any) => {
+            const pos = e.target.getLatLng()
+            onChange(pos.lat, pos.lng)
+          })
         }
         // Click para seleccionar
         map.on('click', (e: any) => {
           const { lat: clat, lng: clng } = e.latlng
           if (!markerRef.current) {
-            markerRef.current = L.marker([clat, clng], { draggable: false }).addTo(map)
+            markerRef.current = L.marker([clat, clng], { draggable: true }).addTo(map)
+            markerRef.current.on('dragend', (ev: any) => {
+              const pos = ev.target.getLatLng()
+              onChange(pos.lat, pos.lng)
+            })
           } else {
             markerRef.current.setLatLng([clat, clng])
           }
@@ -197,7 +235,11 @@ export default function ParkingsPage() {
       const nlng = typeof lng === 'string' ? parseFloat(lng) : (lng as number)
       if (isNaN(nlat) || isNaN(nlng)) return
       if (!markerRef.current) {
-        markerRef.current = L.marker([nlat, nlng], { draggable: false }).addTo(map)
+        markerRef.current = L.marker([nlat, nlng], { draggable: true }).addTo(map)
+        markerRef.current.on('dragend', (e: any) => {
+          const pos = e.target.getLatLng()
+          onChange(pos.lat, pos.lng)
+        })
       } else {
         markerRef.current.setLatLng([nlat, nlng])
       }
@@ -207,7 +249,19 @@ export default function ParkingsPage() {
     return (
       <div className="rounded-md overflow-hidden border">
         <div ref={mapRef} style={{ width: '100%', height }} />
-        <div className="px-3 py-2 text-xs text-muted-foreground">Haz click en el mapa para seleccionar coordenadas</div>
+        <div className="px-3 py-2 text-xs text-muted-foreground">
+          Haz click o arrastra el marcador para seleccionar coordenadas.
+          {(() => {
+            const nlat = typeof lat === 'string' ? parseFloat(lat) : (lat as number)
+            const nlng = typeof lng === 'string' ? parseFloat(lng) : (lng as number)
+            if (isNaN(nlat) || isNaN(nlng)) return null
+            return (
+              <span className="ml-2">
+                Coordenadas: {nlat.toFixed(6)}, {nlng.toFixed(6)}
+              </span>
+            )
+          })()}
+        </div>
       </div>
     )
   }
@@ -259,23 +313,34 @@ export default function ParkingsPage() {
     void load()
   }, [user?.rol, (user as any)?.id_usuario])
   const handleCreate = async () => {
-    const payload = {
-      nombre: formData.name,
-      direccion: formData.address,
-      capacidad_total: Number.parseInt(formData.totalSpaces),
-      latitud: Number(formData.lat),
-      longitud: Number(formData.lng),
-      id_admin_asignado: formData.adminId || undefined,
-    }
-    // Validación simple
-    if (!payload.nombre || !payload.direccion || !payload.capacidad_total || isNaN(payload.latitud) || isNaN(payload.longitud)) {
-      setOpMessage("Completa nombre, dirección, capacidad y coordenadas válidas (latitud/longitud)")
-      setOpType("error")
-      return
-    }
     try {
-      await apiCreateParking(payload)
-      // Refrescar lista
+      const payload = {
+        nombre: formData.name.trim(),
+        direccion: formData.address.trim(),
+        capacidad_total: Number.parseInt(formData.totalSpaces),
+        latitud: Number(formData.lat),
+        longitud: Number(formData.lng),
+        id_admin_asignado: formData.adminId || undefined, // Usar undefined para indicar sin administrador
+        tarifa: formData.hourlyRate ? Number(formData.hourlyRate) : 0
+      }
+
+      // Validación básica
+      if (!payload.nombre || !payload.direccion || isNaN(payload.capacidad_total) || 
+          isNaN(payload.latitud) || isNaN(payload.longitud)) {
+        return // No mostramos mensaje de error
+      }
+
+      // Crear el parking
+      const result = await apiCreateParking(payload)
+      
+      // Si se seleccionó un admin, asignarlo (ya se envía en el payload)
+      // La asignación se maneja directamente en el backend
+
+      // Cerrar diálogo y limpiar formulario
+      setIsCreateDialogOpen(false)
+      setFormData(initialFormData)
+      
+      // Recargar la lista de parkings
       const fresh = await listAllParkings()
       const mapped = fresh.map((p: ParkingRecord) => ({
         id: String(p.id_parking),
@@ -284,7 +349,7 @@ export default function ParkingsPage() {
         address: p.direccion,
         totalSpaces: p.capacidad_total,
         occupiedSpaces: p.ocupados ?? 0,
-        hourlyRate: (p as any).tarifa_hora ?? (p as any).tarifa ?? undefined,
+        hourlyRate: (p as any).tarifa_hora ?? (p as any).tarifa ?? 0,
         status: p.estado ?? "active",
         adminName: p.admin_nombre,
         id_admin: p.id_admin,
@@ -372,8 +437,9 @@ export default function ParkingsPage() {
       totalSpaces: String(parking.totalSpaces ?? ""),
       hourlyRate: String(parking.hourlyRate ?? ""),
       adminId: parking.id_admin || "",
-      lat: parking.latitud ? String(parking.latitud) : "",
-      lng: parking.longitud ? String(parking.longitud) : "",
+      // Asegurarse de que las coordenadas tengan valores por defecto si no existen
+      lat: parking.latitud ? String(parking.latitud) : "-11.985608",
+      lng: parking.longitud ? String(parking.longitud) : "-77.07203",
     })
     setIsEditDialogOpen(true)
   }
@@ -455,7 +521,7 @@ export default function ParkingsPage() {
               </div>
 
               {user?.rol === "admin_general" && (
-                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                <Dialog open={isCreateDialogOpen} onOpenChange={handleDialogClose}>
                   <DialogTrigger asChild>
                     <Button className="bg-green-600 hover:bg-green-700 text-white">
                       <Plus className="mr-2 h-4 w-4" />
@@ -513,8 +579,8 @@ export default function ParkingsPage() {
                           onChange={(e) => setFormData({ ...formData, hourlyRate: decimal2(e.target.value) })}
                           placeholder="2.50"
                         />
-                        {!validRate && formData.hourlyRate !== "" && (
-                          <p className="text-xs text-red-600">Número válido con hasta 2 decimales.</p>
+                        {formData.hourlyRate !== "" && !isNumber(formData.hourlyRate) && (
+                          <p className="text-xs text-red-600">Ingrese un número válido</p>
                         )}
                       </div>
                     </div>
@@ -763,19 +829,20 @@ export default function ParkingsPage() {
                   value={formData.hourlyRate}
                   onChange={(e) => setFormData({ ...formData, hourlyRate: decimal2(e.target.value) })}
                 />
-                {!validRate && formData.hourlyRate !== "" && (
-                  <p className="text-xs text-red-600">Número válido con hasta 2 decimales.</p>
+                {formData.hourlyRate !== "" && !isNumber(formData.hourlyRate) && (
+                  <p className="text-xs text-red-600">Ingrese un número válido</p>
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="grid gap-2">
                 <Label htmlFor="edit-lat">Latitud</Label>
                 <Input
                   id="edit-lat"
                   type="number"
+                  step="any"
                   value={formData.lat}
-                  onChange={(e) => setFormData({ ...formData, lat: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, lat: e.target.value }))}
                 />
                 {!validLat && formData.lat !== "" && (
                   <p className="text-xs text-red-600">Latitud entre -90 y 90.</p>
@@ -786,37 +853,62 @@ export default function ParkingsPage() {
                 <Input
                   id="edit-lng"
                   type="number"
+                  step="any"
                   value={formData.lng}
-                  onChange={(e) => setFormData({ ...formData, lng: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, lng: e.target.value }))}
                 />
                 {!validLng && formData.lng !== "" && (
                   <p className="text-xs text-red-600">Longitud entre -180 y 180.</p>
                 )}
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Actualiza coordenadas o usa tu ubicación actual.</p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  if (typeof navigator !== "undefined" && navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition((pos) => {
-                      const { latitude, longitude } = pos.coords
-                      setFormData((prev) => ({ ...prev, lat: String(latitude), lng: String(longitude) }))
-                    })
-                  }
-                }}
-              >
-                Usar mi ubicación
-              </Button>
+            
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  Arrastra el marcador para cambiar la ubicación o haz clic en el mapa
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (typeof navigator !== "undefined" && navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition((pos) => {
+                        const { latitude, longitude } = pos.coords
+                        setFormData(prev => ({
+                          ...prev,
+                          lat: String(latitude),
+                          lng: String(longitude)
+                        }))
+                      })
+                    }
+                  }}
+                >
+                  Usar mi ubicación
+                </Button>
+              </div>
+              
+              <div className="rounded-md border overflow-hidden" style={{ height: '300px' }}>
+                <MapPicker
+                  lat={formData.lat}
+                  lng={formData.lng}
+                  onChange={(lat, lng) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      lat: String(lat),
+                      lng: String(lng)
+                    }))
+                  }}
+                  height={300}
+                />
+              </div>
+              
+              <div className="text-xs text-muted-foreground">
+                <p>Coordenadas actuales: {formData.lat && formData.lng ? `${formData.lat}, ${formData.lng}` : 'No definidas'}</p>
+              </div>
             </div>
-            <MapPicker
-              lat={formData.lat}
-              lng={formData.lng}
-              onChange={(clat, clng) => setFormData((prev) => ({ ...prev, lat: String(clat), lng: String(clng) }))}
-              height={300}
-            />
+            {/* Mostrar selector de administrador solo para admin_general */}
             {user?.rol === "admin_general" && (
               <div className="grid gap-2">
                 <Label>Administrador Asignado</Label>

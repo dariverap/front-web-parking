@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Breadcrumbs } from "@/components/breadcrumbs"
 import { MetricsCard } from "@/components/metrics-card"
@@ -13,9 +13,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Car, ParkingCircle, DollarSign, Calendar, Eye, Clock, Edit, Trash2 } from "lucide-react"
 import { AuthGuard, useAuth } from "@/components/auth-guard"
+import { LeafletMapPicker } from "@/components/leaflet-map-picker"
+import { Eye, Edit, Trash2, ParkingCircle, Car, DollarSign, Calendar } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 import { listParkingsByUser, listParkingsByAdmin, getParkingById, updateParking as apiUpdateParking, softDeleteParking as apiSoftDeleteParking, type ParkingRecord } from "@/lib/parkings"
+
 
 export default function MyParkingsPage() {
   const router = useRouter()
@@ -37,9 +40,11 @@ export default function MyParkingsPage() {
   const [selectedParking, setSelectedParking] = useState<any>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteReason, setDeleteReason] = useState("")
   const [formData, setFormData] = useState({ name: "", address: "", totalSpaces: "", lat: "", lng: "" })
+  const [mapUrl, setMapUrl] = useState("")
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [viewParking, setViewParking] = useState<any>(null)
   const [viewLoading, setViewLoading] = useState(false)
@@ -142,41 +147,60 @@ export default function MyParkingsPage() {
       name: p?.name || "",
       address: p?.address || "",
       totalSpaces: String(p?.totalSpaces ?? ""),
-      lat: p?.latitud ? String(p.latitud) : "",
-      lng: p?.longitud ? String(p.longitud) : "",
+      lat: p?.latitud ? String(p.latitud) : "-11.985608",
+      lng: p?.longitud ? String(p.longitud) : "-77.07203",
     })
     setIsEditDialogOpen(true)
   }
 
   const handleEdit = async () => {
     if (!selectedParking) return
-    const id = selectedParking.id_parking
-    const payload: any = {
-      nombre: formData.name?.trim() || undefined,
-      direccion: formData.address?.trim() || undefined,
-      capacidad_total: formData.totalSpaces ? Number(formData.totalSpaces) : undefined,
+    try {
+      setIsSaving(true)
+      const id = selectedParking.id_parking
+      const payload: any = {
+        nombre: formData.name?.trim() || undefined,
+        direccion: formData.address?.trim() || undefined,
+        capacidad_total: formData.totalSpaces ? Number(formData.totalSpaces) : undefined,
+      }
+      if (formData.lat) payload.latitud = Number(formData.lat)
+      if (formData.lng) payload.longitud = Number(formData.lng)
+
+      await apiUpdateParking(id, payload)
+
+      // Refrescar lista igual que el load inicial (combinar admin y user, deduplicar)
+      const role = user?.rol || ""
+      const uid = (user as any)?.id_usuario || ""
+      const adminId = (user as any)?.id || uid || ""
+      const [byAdmin, byUser] = await Promise.all([
+        adminId ? listParkingsByAdmin(adminId) : Promise.resolve([]),
+        uid ? listParkingsByUser(uid) : Promise.resolve([]),
+      ])
+      const combined: ParkingRecord[] = [...(Array.isArray(byAdmin) ? byAdmin : []), ...(Array.isArray(byUser) ? byUser : [])]
+      const unique = Object.values(Object.fromEntries((combined as any[]).map((p: any) => [p.id_parking, p]))) as any[]
+      const mapped = unique.map((p: any) => ({
+        id: String(p.id_parking),
+        id_parking: p.id_parking,
+        name: p.nombre,
+        address: p.direccion,
+        totalSpaces: p.capacidad_total,
+        occupiedSpaces: (p as any).ocupados ?? 0,
+        status: p.estado ?? "active",
+        revenue: (p as any).revenue ?? 0,
+        latitud: p.latitud,
+        longitud: p.longitud,
+      }))
+      setParkings(mapped)
+
+      toast({ title: "Cambios guardados", description: "El parking se actualizó correctamente." })
+      setIsEditDialogOpen(false)
+      setSelectedParking(null)
+    } catch (err: any) {
+      console.error("Error al actualizar parking:", err)
+      toast({ title: "Error al guardar", description: "No se pudo actualizar el parking.", variant: "destructive" as any })
+    } finally {
+      setIsSaving(false)
     }
-    if (formData.lat) payload.latitud = Number(formData.lat)
-    if (formData.lng) payload.longitud = Number(formData.lng)
-    await apiUpdateParking(id, payload)
-    // refrescar lista
-    const uid = (user as any)?.id_usuario
-    const fresh = await listParkingsByUser(uid)
-    const mapped = (fresh as any[]).map((p: ParkingRecord) => ({
-      id: String(p.id_parking),
-      id_parking: p.id_parking,
-      name: p.nombre,
-      address: p.direccion,
-      totalSpaces: p.capacidad_total,
-      occupiedSpaces: (p as any).ocupados ?? 0,
-      status: p.estado ?? "active",
-      revenue: (p as any).revenue ?? 0,
-      latitud: p.latitud,
-      longitud: p.longitud,
-    }))
-    setParkings(mapped)
-    setIsEditDialogOpen(false)
-    setSelectedParking(null)
   }
 
   const openDeleteDialog = (p: any) => {
@@ -388,35 +412,66 @@ export default function MyParkingsPage() {
 
             {/* Diálogo editar */}
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogContent className="sm:max-w-[560px]">
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Editar parking</DialogTitle>
                   <DialogDescription>Modifica los datos básicos de tu parking.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-2">
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">Nombre</Label>
-                    <Input id="name" className="col-span-3" value={formData.name} onChange={e => setFormData(v => ({ ...v, name: e.target.value }))} />
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Nombre</Label>
+                    <Input id="name" value={formData.name} onChange={e => setFormData(v => ({ ...v, name: e.target.value }))} />
                   </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="address" className="text-right">Dirección</Label>
-                    <Textarea id="address" className="col-span-3" value={formData.address} onChange={e => setFormData(v => ({ ...v, address: e.target.value }))} />
+                  <div className="grid gap-2">
+                    <Label htmlFor="address">Dirección</Label>
+                    <Textarea id="address" value={formData.address} onChange={e => setFormData(v => ({ ...v, address: e.target.value }))} />
                   </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="totalSpaces" className="text-right">Capacidad</Label>
-                    <Input id="totalSpaces" type="number" className="col-span-3" value={formData.totalSpaces} onChange={e => setFormData(v => ({ ...v, totalSpaces: e.target.value }))} />
+                  <div className="grid gap-2">
+                    <Label htmlFor="totalSpaces">Capacidad Total</Label>
+                    <Input id="totalSpaces" type="number" value={formData.totalSpaces} onChange={e => setFormData(v => ({ ...v, totalSpaces: e.target.value }))} />
                   </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Lat/Lng</Label>
-                    <div className="col-span-3 grid grid-cols-2 gap-2">
-                      <Input placeholder="Latitud" value={formData.lat} onChange={e => setFormData(v => ({ ...v, lat: e.target.value }))} />
-                      <Input placeholder="Longitud" value={formData.lng} onChange={e => setFormData(v => ({ ...v, lng: e.target.value }))} />
+                  <div className="grid grid-cols-2 gap-4 mb-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-lat">Latitud</Label>
+                      <Input
+                        id="edit-lat"
+                        type="number"
+                        step="any"
+                        value={formData.lat}
+                        onChange={(e) => setFormData(prev => ({ ...prev, lat: e.target.value }))}
+                        placeholder="-11.985608"
+                      />
                     </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="edit-lng">Longitud</Label>
+                      <Input
+                        id="edit-lng"
+                        type="number"
+                        step="any"
+                        value={formData.lng}
+                        onChange={(e) => setFormData(prev => ({ ...prev, lng: e.target.value }))}
+                        placeholder="-77.072030"
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-md border overflow-hidden" style={{ height: '300px' }}>
+                    <LeafletMapPicker
+                      lat={formData.lat}
+                      lng={formData.lng}
+                      onChange={(lat, lng) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          lat: String(lat),
+                          lng: String(lng)
+                        }))
+                      }}
+                      height={300}
+                    />
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
-                  <Button onClick={handleEdit}>Guardar</Button>
+                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} disabled={isSaving}>Cancelar</Button>
+                  <Button onClick={handleEdit} disabled={isSaving}>{isSaving ? 'Guardando...' : 'Guardar'}</Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
