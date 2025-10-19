@@ -1,0 +1,900 @@
+"use client"
+
+import { useParams } from "next/navigation"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { AuthGuard } from "@/components/auth-guard"
+import { Breadcrumbs } from "@/components/breadcrumbs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { ClipboardList, Car, ParkingCircle, DollarSign, Percent, Clock, Plus, Edit, Trash2, RefreshCcw, Lock, Unlock, CheckCircle2, AlertCircle, X, LogOut } from "lucide-react"
+import { listTarifasByParking, createTarifa, updateTarifa, deleteTarifa, type TarifaRecord } from "@/lib/tarifas"
+import { listSpacesByParking, toggleSpaceEnabled, type SpaceRecord } from "@/lib/spaces"
+import { listReservasByParking, listOcupacionesActivas, confirmarEntrada, registrarSalida, type ReservaRecord, type OcupacionRecord } from "@/lib/reservas"
+
+export default function ParkingManagementPage() {
+  const params = useParams()
+  const parkingId = params?.id as string | undefined
+
+  // ========== TARIFAS STATE ==========
+  const [tarifas, setTarifas] = useState<TarifaRecord[]>([])
+  const [tLoading, setTLoading] = useState(false)
+  const [isTarifaDialogOpen, setIsTarifaDialogOpen] = useState(false)
+  const [editingTarifa, setEditingTarifa] = useState<TarifaRecord | null>(null)
+  const [tarifaForm, setTarifaForm] = useState<{tipo: string, monto: string, condiciones: string}>({
+    tipo: "hora",
+    monto: "",
+    condiciones: ""
+  })
+  const [tarifaError, setTarifaError] = useState("")
+  const [isSubmittingTarifa, setIsSubmittingTarifa] = useState(false)
+
+  // ========== ESPACIOS STATE ==========
+  const [spaces, setSpaces] = useState<SpaceRecord[]>([])
+  const [sLoading, setSLoading] = useState(false)
+  const [spaceQuery, setSpaceQuery] = useState("")
+  const [page, setPage] = useState(1)
+  const pageSize = 10
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [spaceError, setSpaceError] = useState("")
+
+  // Pagination & filter
+  const filteredSpaces = useMemo(() => {
+    const q = spaceQuery.toLowerCase().trim()
+    const arr = q ? spaces.filter(s => (s.numero_espacio || "").toLowerCase().includes(q)) : spaces
+    return arr
+  }, [spaces, spaceQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredSpaces.length / pageSize))
+  const currentPage = Math.min(page, totalPages)
+  const start = (currentPage - 1) * pageSize
+  const end = start + pageSize
+  const pagedSpaces = filteredSpaces.slice(start, end)
+
+  // ========== RESERVAS STATE ==========
+  const [reservas, setReservas] = useState<ReservaRecord[]>([])
+  const [ocupaciones, setOcupaciones] = useState<OcupacionRecord[]>([])
+  const [rLoading, setRLoading] = useState(false)
+  const [reservaError, setReservaError] = useState("")
+  const [confirmandoEntrada, setConfirmandoEntrada] = useState<string | null>(null)
+  const [registrandoSalida, setRegistrandoSalida] = useState<string | null>(null)
+
+  // ========== STATISTICS ==========
+  const [stats, setStats] = useState({
+    reservasActivas: 0,
+    vehiculosDentro: 0,
+    espaciosDisponibles: 0,
+    ingresosHoy: 0,
+    ocupacion: 0,
+    tiempoPromedio: "0h 0m"
+  })
+
+  // ========== TARIFAS HANDLERS ==========
+  const reloadTarifas = useCallback(async () => {
+    if (!parkingId) return
+    setTLoading(true)
+    setTarifaError("")
+    try {
+      const data = await listTarifasByParking(parkingId)
+      setTarifas(data)
+    } catch (err: any) {
+      setTarifaError(err?.message || "Error al cargar tarifas")
+    } finally {
+      setTLoading(false)
+    }
+  }, [parkingId])
+
+  const openCreateTarifa = () => {
+    setEditingTarifa(null)
+    setTarifaForm({ tipo: "hora", monto: "", condiciones: "" })
+    setTarifaError("")
+    setIsTarifaDialogOpen(true)
+  }
+
+  const openEditTarifa = (t: TarifaRecord) => {
+    setEditingTarifa(t)
+    setTarifaForm({
+      tipo: t.tipo,
+      monto: String(t.monto),
+      condiciones: t.condiciones || ""
+    })
+    setTarifaError("")
+    setIsTarifaDialogOpen(true)
+  }
+
+  const handleCloseDialog = () => {
+    setIsTarifaDialogOpen(false)
+    setEditingTarifa(null)
+    setTarifaError("")
+    setIsSubmittingTarifa(false)
+  }
+
+  const submitTarifa = async () => {
+    if (!parkingId) return
+    const { tipo, monto, condiciones } = tarifaForm
+    if (!tipo.trim()) {
+      setTarifaError("El tipo es requerido")
+      return
+    }
+    if (!monto.trim()) {
+      setTarifaError("El monto es requerido")
+      return
+    }
+    setTarifaError("")
+    setIsSubmittingTarifa(true)
+    try {
+      if (editingTarifa) {
+        await updateTarifa(editingTarifa.id_tarifa, {
+          tipo: tipo.trim(),
+          monto: parseFloat(monto),
+          condiciones: condiciones.trim() || null
+        })
+      } else {
+        await createTarifa(parkingId, {
+          tipo: tipo.trim(),
+          monto: parseFloat(monto),
+          condiciones: condiciones.trim() || null
+        })
+      }
+      await reloadTarifas()
+      handleCloseDialog()
+    } catch (err: any) {
+      setTarifaError(err?.message || "Error al guardar tarifa")
+    } finally {
+      setIsSubmittingTarifa(false)
+    }
+  }
+
+  const handleDeleteTarifa = async (t: TarifaRecord) => {
+    if (!window.confirm("¿Eliminar esta tarifa?")) return
+    setTarifaError("")
+    try {
+      await deleteTarifa(t.id_tarifa)
+      await reloadTarifas()
+    } catch (err: any) {
+      setTarifaError(err?.message || "Error al eliminar")
+    }
+  }
+
+  // ========== ESPACIOS HANDLERS ==========
+  const reloadSpaces = useCallback(async () => {
+    if (!parkingId) return
+    setSLoading(true)
+    setSpaceError("")
+    try {
+      const data = await listSpacesByParking(parkingId)
+      const sorted = data.sort((a, b) => {
+        const aNum = a.numero_espacio || ""
+        const bNum = b.numero_espacio || ""
+        const aInt = parseInt(aNum, 10)
+        const bInt = parseInt(bNum, 10)
+        if (!isNaN(aInt) && !isNaN(bInt)) return aInt - bInt
+        return aNum.localeCompare(bNum)
+      })
+      setSpaces(sorted)
+    } catch (err: any) {
+      setSpaceError(err?.message || "Error al cargar espacios")
+    } finally {
+      setSLoading(false)
+    }
+  }, [parkingId])
+
+  const handleToggleEnabled = async (s: SpaceRecord) => {
+    if (!parkingId) return
+    if (s.estado === 'ocupado' || s.estado === 'reservado') return
+    const nextEstado = s.estado === 'inhabilitado' ? 'disponible' : 'inhabilitado'
+    setTogglingId(s.id_espacio)
+    setSpaceError("")
+    const oldSpaces = [...spaces]
+    setSpaces(prev => prev.map(x => x.id_espacio === s.id_espacio ? { ...x, estado: nextEstado } : x))
+    try {
+      await toggleSpaceEnabled(parkingId, s.id_espacio)
+      let confirmed = false
+      for (let i = 0; i < 6; i++) {
+        await new Promise(r => setTimeout(r, 400))
+        const fresh = await listSpacesByParking(parkingId)
+        const target = fresh.find(x => x.id_espacio === s.id_espacio)
+        if (target && target.estado === nextEstado) {
+          confirmed = true
+          setSpaces(fresh.sort((a, b) => {
+            const aNum = a.numero_espacio || ""
+            const bNum = b.numero_espacio || ""
+            const aInt = parseInt(aNum, 10)
+            const bInt = parseInt(bNum, 10)
+            if (!isNaN(aInt) && !isNaN(bInt)) return aInt - bInt
+            return aNum.localeCompare(bNum)
+          }))
+          break
+        }
+      }
+      if (!confirmed) throw new Error("No se pudo confirmar el cambio")
+    } catch (err: any) {
+      setSpaces(oldSpaces)
+      setSpaceError(err?.message || "Error al cambiar estado")
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  // ========== RESERVAS HANDLERS ==========
+  const reloadReservas = useCallback(async () => {
+    if (!parkingId) return
+    setRLoading(true)
+    setReservaError("")
+    try {
+      // Obtener reservas activas y pendientes
+      const [reservasActivas, reservasPendientes, ocupacionesActivas] = await Promise.all([
+        listReservasByParking(parkingId, "activa"),
+        listReservasByParking(parkingId, "pendiente"),
+        listOcupacionesActivas(parkingId)
+      ])
+      
+      setReservas([...reservasActivas, ...reservasPendientes])
+      setOcupaciones(ocupacionesActivas)
+    } catch (err: any) {
+      setReservaError(err?.message || "Error al cargar reservas")
+      console.error(err)
+    } finally {
+      setRLoading(false)
+    }
+  }, [parkingId])
+
+  const handleConfirmarEntrada = async (idReserva: string) => {
+    if (!window.confirm("¿Confirmar entrada del vehículo al parking?")) return
+    setConfirmandoEntrada(idReserva)
+    setReservaError("")
+    try {
+      await confirmarEntrada(idReserva)
+      await reloadReservas()
+      await reloadSpaces() // Actualizar estado de espacios
+    } catch (err: any) {
+      setReservaError(err?.message || "Error al confirmar entrada")
+    } finally {
+      setConfirmandoEntrada(null)
+    }
+  }
+
+  const handleMarcarSalida = async (idOcupacion: string) => {
+    if (!window.confirm("¿Marcar salida del vehículo? Se calculará el monto a cobrar.")) return
+    setRegistrandoSalida(idOcupacion)
+    setReservaError("")
+    try {
+      const resultado = await registrarSalida(idOcupacion)
+      alert(`Salida registrada. Monto: S/. ${resultado.monto_calculado?.toFixed(2) || 0}`)
+      await reloadReservas()
+      await reloadSpaces() // Actualizar estado de espacios
+    } catch (err: any) {
+      setReservaError(err?.message || "Error al registrar salida")
+    } finally {
+      setRegistrandoSalida(null)
+    }
+  }
+
+  // ========== CALCULATE STATISTICS ==========
+  useEffect(() => {
+    const disponibles = spaces.filter(s => s.estado === 'disponible').length
+    const total = spaces.length
+    const ocupados = spaces.filter(s => s.estado === 'ocupado').length
+    const ocupacionPercent = total > 0 ? Math.round((ocupados / total) * 100) : 0
+    
+    // Calcular tiempo promedio de ocupaciones (solo las que tienen salida)
+    let tiempoPromedio = "0h 0m"
+    if (ocupaciones.length > 0) {
+      const ocupacionesConTiempo = ocupaciones.filter(o => o.hora_salida && o.tiempo_total)
+      if (ocupacionesConTiempo.length > 0) {
+        const totalMinutos = ocupacionesConTiempo.reduce((sum, o) => sum + (o.tiempo_total || 0), 0)
+        const promedioMinutos = Math.round(totalMinutos / ocupacionesConTiempo.length)
+        const horas = Math.floor(promedioMinutos / 60)
+        const minutos = promedioMinutos % 60
+        tiempoPromedio = `${horas}h ${minutos}m`
+      }
+    }
+    
+    // Calcular ingresos del día (solo ocupaciones con monto)
+    const hoy = new Date().toISOString().split('T')[0]
+    const ingresosHoy = ocupaciones
+      .filter(o => {
+        if (!o.hora_entrada) return false
+        const fechaEntrada = new Date(o.hora_entrada).toISOString().split('T')[0]
+        return fechaEntrada === hoy && o.costo_total
+      })
+      .reduce((sum, o) => sum + (o.costo_total || o.monto_calculado || 0), 0)
+    
+    setStats({
+      reservasActivas: reservas.length,
+      vehiculosDentro: ocupaciones.length,
+      espaciosDisponibles: disponibles,
+      ingresosHoy,
+      ocupacion: ocupacionPercent,
+      tiempoPromedio
+    })
+  }, [spaces, reservas, ocupaciones])
+
+  // ========== INITIAL LOAD ==========
+  useEffect(() => {
+    if (parkingId) {
+      void reloadTarifas()
+      void reloadSpaces()
+      void reloadReservas()
+    }
+  }, [parkingId, reloadTarifas, reloadSpaces, reloadReservas])
+
+  const breadcrumbs = [
+    { label: "Inicio", href: "/" },
+    { label: "Mis Parkings", href: "/my-parkings" },
+    { label: `Parking #${parkingId || ""}`, href: "#" }
+  ]
+
+  return (
+    <AuthGuard allowedRoles={["admin_general", "admin_parking", "empleado"]}>
+      <div className="p-6 pt-16 md:pt-6">
+        <Breadcrumbs items={breadcrumbs} />
+        
+        <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <h1 className="text-3xl font-bold">Gestión de Parking</h1>
+            <p className="text-muted-foreground mt-2">
+              Administra reservas, tarifas y espacios
+            </p>
+          </div>
+
+          {parkingId ? (
+            <>
+              {/* STATISTICS CARDS */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Reservas Activas</CardTitle>
+                    <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.reservasActivas}</div>
+                    <p className="text-xs text-muted-foreground">Pendientes de confirmar</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Vehículos Dentro</CardTitle>
+                    <Car className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.vehiculosDentro}</div>
+                    <p className="text-xs text-muted-foreground">En el parking ahora</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Espacios Disponibles</CardTitle>
+                    <ParkingCircle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.espaciosDisponibles}</div>
+                    <p className="text-xs text-muted-foreground">De {spaces.length} totales</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Ingresos Hoy</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">S/. {stats.ingresosHoy.toFixed(2)}</div>
+                    <p className="text-xs text-muted-foreground">Total del día</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Ocupación</CardTitle>
+                    <Percent className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.ocupacion}%</div>
+                    <p className="text-xs text-muted-foreground">Porcentaje actual</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Tiempo Promedio</CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{stats.tiempoPromedio}</div>
+                    <p className="text-xs text-muted-foreground">Estadía media</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* TABS */}
+              <Tabs defaultValue="reservas" className="space-y-4">
+                <TabsList className="grid w-full grid-cols-3 lg:w-[450px] p-1">
+                  <TabsTrigger 
+                    value="reservas" 
+                    className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    <span className="hidden sm:inline">Reservas</span>
+                    <span className="sm:hidden">📋</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="tarifas" 
+                    className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  >
+                    <DollarSign className="h-4 w-4" />
+                    <span className="hidden sm:inline">Tarifas</span>
+                    <span className="sm:hidden">💰</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="espacios" 
+                    className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  >
+                    <ParkingCircle className="h-4 w-4" />
+                    <span className="hidden sm:inline">Espacios</span>
+                    <span className="sm:hidden">🅿️</span>
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* TAB: RESERVAS */}
+                <TabsContent value="reservas" className="space-y-4 mt-0 min-h-[600px]">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Reservas Activas</CardTitle>
+                      <Button variant="ghost" size="icon" onClick={() => void reloadReservas()} disabled={rLoading}>
+                        <RefreshCcw className="h-4 w-4" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      {rLoading ? (
+                        <p className="text-sm text-muted-foreground">Cargando...</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Usuario</TableHead>
+                                <TableHead>Vehículo</TableHead>
+                                <TableHead>Espacio</TableHead>
+                                <TableHead>Hora Reserva</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {reservas.map(r => {
+                                const nombreUsuario = r.usuario ? `${r.usuario.nombre} ${r.usuario.apellido}` : "N/A"
+                                const placaVehiculo = r.vehiculo?.placa || "N/A"
+                                const numeroEspacio = r.espacio?.numero_espacio || "N/A"
+                                const horaReserva = new Date(r.hora_inicio).toLocaleString('es-PE', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })
+                                const estaBusy = confirmandoEntrada === r.id_reserva
+
+                                return (
+                                  <TableRow key={r.id_reserva}>
+                                    <TableCell className="font-medium">{nombreUsuario}</TableCell>
+                                    <TableCell>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{placaVehiculo}</span>
+                                        {r.vehiculo?.marca && (
+                                          <span className="text-xs text-muted-foreground">
+                                            {r.vehiculo.marca} {r.vehiculo.modelo}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="secondary">{numeroEspacio}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm">{horaReserva}</TableCell>
+                                    <TableCell>
+                                      <Badge 
+                                        variant={r.estado === 'activa' ? 'default' : 'outline'}
+                                        className={r.estado === 'activa' ? 'bg-blue-100 text-blue-800' : ''}
+                                      >
+                                        {r.estado}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <Button 
+                                        size="sm" 
+                                        className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                                        title="Confirmar entrada"
+                                        disabled={estaBusy}
+                                        onClick={() => void handleConfirmarEntrada(r.id_reserva)}
+                                      >
+                                        <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                                        Confirmar Entrada
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                              {reservas.length === 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                                    No hay reservas activas
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                      {reservaError && (
+                        <div className="mt-3 text-sm text-red-600">{reservaError}</div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Vehículos Dentro del Parking</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Usuario</TableHead>
+                              <TableHead>Vehículo</TableHead>
+                              <TableHead>Hora Entrada</TableHead>
+                              <TableHead>Espacio</TableHead>
+                              <TableHead className="text-right">Acciones</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {ocupaciones.map(o => {
+                              const horaEntrada = new Date(o.hora_entrada).toLocaleString('es-PE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                              const estaBusy = registrandoSalida === o.id_ocupacion
+
+                              return (
+                                <TableRow key={o.id_ocupacion}>
+                                  <TableCell className="font-medium">
+                                    {o.nombre_usuario || "N/A"}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{o.placa || "N/A"}</span>
+                                      {o.marca && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {o.marca} {o.modelo}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-sm">{horaEntrada}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="secondary">{o.numero_espacio || "N/A"}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <Button 
+                                      size="sm"
+                                      className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                                      disabled={estaBusy}
+                                      onClick={() => void handleMarcarSalida(o.id_ocupacion)}
+                                    >
+                                      <LogOut className="h-4 w-4 mr-1.5" />
+                                      {estaBusy ? 'Procesando...' : 'Marcar Salida'}
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            })}
+                            {ocupaciones.length === 0 && (
+                              <TableRow>
+                                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
+                                  No hay vehículos dentro
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* TAB: TARIFAS */}
+                <TabsContent value="tarifas" className="space-y-4 mt-0 min-h-[600px]">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Tarifas</CardTitle>
+                      <Button onClick={openCreateTarifa} size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nueva Tarifa
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      {tLoading ? (
+                        <p className="text-sm text-muted-foreground">Cargando tarifas...</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Tipo</TableHead>
+                                <TableHead>Monto</TableHead>
+                                <TableHead>Condiciones</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {tarifas.map(t => (
+                                <TableRow key={t.id_tarifa}>
+                                  <TableCell className="font-medium">{t.tipo}</TableCell>
+                                  <TableCell>S/. {Number(t.monto).toFixed(2)}</TableCell>
+                                  <TableCell className="max-w-md truncate">{t.condiciones || "—"}</TableCell>
+                                  <TableCell className="text-right">
+                                    <Button variant="ghost" size="sm" className="text-blue-600" onClick={() => openEditTarifa(t)}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => void handleDeleteTarifa(t)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                              {tarifas.length === 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={4} className="text-center text-sm text-muted-foreground">Sin tarifas</TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                  {tarifaError && (
+                    <div className="mt-3 text-sm text-red-600">{tarifaError}</div>
+                  )}
+                </TabsContent>
+
+                {/* TAB: ESPACIOS */}
+                <TabsContent value="espacios" className="space-y-4 mt-0 min-h-[600px]">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Espacios</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <div className="hidden md:block text-sm text-muted-foreground mr-2">
+                          {filteredSpaces.length} espacios
+                        </div>
+                        <Badge variant="secondary">Parking #{parkingId || "—"}</Badge>
+                        <div className="w-40">
+                          <Input 
+                            placeholder="Buscar..." 
+                            value={spaceQuery} 
+                            onChange={e => setSpaceQuery(e.target.value)} 
+                          />
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => void reloadSpaces()} disabled={sLoading}>
+                          <RefreshCcw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {sLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <div className="text-center">
+                            <RefreshCcw className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">Cargando espacios...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Vista Grid de Espacios */}
+                          {filteredSpaces.length > 0 ? (
+                            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10 gap-2">
+                              {pagedSpaces.map(s => {
+                                const busy = togglingId === s.id_espacio
+                                const blocked = s.estado === 'ocupado' || s.estado === 'reservado'
+                                const isDisponible = s.estado === 'disponible'
+                                const isOcupado = s.estado === 'ocupado'
+                                const isReservado = s.estado === 'reservado'
+                                const isInhabilitado = s.estado === 'inhabilitado'
+                                
+                                return (
+                                  <Card 
+                                    key={s.id_espacio} 
+                                    className={`relative transition-all duration-200 hover:scale-105 ${
+                                      isDisponible ? 'border-green-200 bg-green-50/50 hover:border-green-300 hover:shadow-md' : 
+                                      isOcupado ? 'border-yellow-200 bg-yellow-50/50' : 
+                                      isReservado ? 'border-blue-200 bg-blue-50/50' :
+                                      'border-gray-200 bg-gray-50/50'
+                                    } ${busy ? 'opacity-50' : ''}`}
+                                  >
+                                    <CardContent className="p-2">
+                                      <div className="flex flex-col items-center gap-1.5">
+                                        {/* Ícono del espacio - más pequeño */}
+                                        <div className={`p-2 rounded-full ${
+                                          isDisponible ? 'bg-green-100' : 
+                                          isOcupado ? 'bg-yellow-100' : 
+                                          isReservado ? 'bg-blue-100' :
+                                          'bg-gray-100'
+                                        }`}>
+                                          {isDisponible && <ParkingCircle className="h-4 w-4 text-green-600" />}
+                                          {isOcupado && <Car className="h-4 w-4 text-yellow-600" />}
+                                          {isReservado && <Clock className="h-4 w-4 text-blue-600" />}
+                                          {isInhabilitado && <Lock className="h-4 w-4 text-gray-500" />}
+                                        </div>
+                                        
+                                        {/* Número de espacio - más compacto */}
+                                        <div className="text-center w-full">
+                                          <p className="font-bold text-sm">{s.numero_espacio}</p>
+                                          <Badge 
+                                            variant="secondary" 
+                                            className={`text-[10px] px-1.5 py-0 mt-0.5 ${
+                                              isDisponible ? 'bg-green-100 text-green-700 border-green-200' : 
+                                              isOcupado ? 'bg-yellow-100 text-yellow-700 border-yellow-200' : 
+                                              isReservado ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                              'bg-gray-100 text-gray-600 border-gray-200'
+                                            }`}
+                                          >
+                                            {isDisponible ? '✓' : 
+                                             isOcupado ? '●' : 
+                                             isReservado ? '◷' : 
+                                             '✕'}
+                                          </Badge>
+                                        </div>
+                                        
+                                        {/* Botón de acción - más pequeño */}
+                                        {!blocked && (
+                                          <Button
+                                            variant={isInhabilitado ? 'default' : 'secondary'}
+                                            size="sm"
+                                            className={`w-full h-7 text-[10px] mt-1 ${
+                                              isInhabilitado 
+                                                ? 'bg-green-600 hover:bg-green-700 text-white' 
+                                                : 'bg-orange-100 hover:bg-orange-200 text-orange-700 border-orange-200'
+                                            }`}
+                                            disabled={busy}
+                                            onClick={() => void handleToggleEnabled(s)}
+                                          >
+                                            {busy ? (
+                                              <RefreshCcw className="h-3 w-3 animate-spin" />
+                                            ) : (
+                                              <>
+                                                {isInhabilitado ? (
+                                                  <><Unlock className="h-3 w-3 mr-0.5" /> On</>
+                                                ) : (
+                                                  <><Lock className="h-3 w-3 mr-0.5" /> Off</>
+                                                )}
+                                              </>
+                                            )}
+                                          </Button>
+                                        )}
+                                        
+                                        {blocked && (
+                                          <div className="text-[10px] text-muted-foreground text-center mt-1 leading-tight">
+                                            {isOcupado ? '🚗' : '📅'}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-12 gap-2">
+                              <ParkingCircle className="h-16 w-16 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground">No se encontraron espacios</p>
+                            </div>
+                          )}
+                          {spaceError && (
+                            <div className="mt-3 text-sm text-red-600">{spaceError}</div>
+                          )}
+                          {/* Pagination */}
+                          {filteredSpaces.length > 0 && (
+                            <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                              <div>
+                                Mostrando {filteredSpaces.length === 0 ? 0 : start + 1}–{Math.min(end, filteredSpaces.length)} de {filteredSpaces.length}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+                                  Anterior
+                                </Button>
+                                <div>Página {currentPage} de {totalPages}</div>
+                                <Button variant="outline" size="sm" disabled={currentPage >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>
+                                  Siguiente
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+
+              {/* DIALOG: TARIFA */}
+              <Dialog open={isTarifaDialogOpen} onOpenChange={handleCloseDialog}>
+                <DialogContent className="sm:max-w-[520px]">
+                  <DialogHeader>
+                    <DialogTitle>{editingTarifa ? 'Editar tarifa' : 'Nueva tarifa'}</DialogTitle>
+                    <DialogDescription>Define tipo, monto y condiciones de la tarifa.</DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-2">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label className="text-right text-sm" htmlFor="tipo">Tipo</label>
+                      <div className="col-span-3">
+                        <Input 
+                          id="tipo" 
+                          value={tarifaForm.tipo} 
+                          onChange={e => setTarifaForm(v => ({ ...v, tipo: e.target.value }))} 
+                          placeholder="hora | dia | mes" 
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label className="text-right text-sm" htmlFor="monto">Monto</label>
+                      <div className="col-span-3">
+                        <Input 
+                          id="monto" 
+                          type="number" 
+                          step="0.01" 
+                          value={tarifaForm.monto} 
+                          onChange={e => setTarifaForm(v => ({ ...v, monto: e.target.value }))} 
+                          placeholder="0.00" 
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <label className="text-right text-sm" htmlFor="condiciones">Condiciones</label>
+                      <div className="col-span-3">
+                        <Textarea 
+                          id="condiciones" 
+                          value={tarifaForm.condiciones} 
+                          onChange={e => setTarifaForm(v => ({ ...v, condiciones: e.target.value }))} 
+                          placeholder="Texto libre (opcional)" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  {tarifaError && (
+                    <div className="text-sm text-red-600">{tarifaError}</div>
+                  )}
+                  <DialogFooter>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleCloseDialog}
+                      disabled={isSubmittingTarifa}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      onClick={() => void submitTarifa()} 
+                      disabled={isSubmittingTarifa}
+                    >
+                      {isSubmittingTarifa ? 'Procesando...' : (editingTarifa ? 'Guardar' : 'Crear')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </AuthGuard>
+  )
+}

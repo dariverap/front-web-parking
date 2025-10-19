@@ -263,9 +263,9 @@ export default function MyParkingsPage() {
                   </SelectContent>
                 </Select>
 
-                <Button onClick={() => selectedParking && router.push(`/parking/${selectedParking.id}/manage`)} disabled={!selectedParking}>
+                <Button onClick={() => selectedParking && router.push(`/my-parkings/${selectedParking.id_parking}`)} disabled={!selectedParking}>
                   <Eye className="mr-2 h-4 w-4" />
-                  Gestionar
+                  Gestionar Parking
                 </Button>
               </div>
             </div>
