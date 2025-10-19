@@ -183,12 +183,12 @@ front-web-parking/
 ### 🔄 Flujo de Autenticación
 
 ```mermaid
-flowchart LR
-    A[Usuario] --> B[/login]
-    B --> C{Login valido?}
-    C -->|Si| D[Guardar token]
-    D --> E[Navegacion privada]
-    C -->|No| F[Mostrar error]
+graph TD
+    A[Usuario] --> B[Login]
+    B --> C{Valido?}
+    C -->|Si| D[Guardar Token]
+    D --> E[App Privada]
+    C -->|No| F[Error]
 ```
 
 ---
