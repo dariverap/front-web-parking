@@ -1,215 +1,293 @@
-# Frontend - Parking System
+# 🚗 Parking Management System - Frontend Web
 
-Aplicación frontend para la gestión de un sistema de estacionamiento (parking), construida con Next.js 14, React 18, Tailwind CSS y la librería de componentes basada en Radix UI.
+<div align="center">
 
-Este frontend forma parte del proyecto general "Parking System" y se integra con la API Node/Express ubicada en `../api-nodejs-parking`. La comunicación se realiza vía HTTP usando `NEXT_PUBLIC_API_URL`.
+![Parking System](https://img.shields.io/badge/Parking-System-blue?style=for-the-badge&logo=react&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-14.2.16-black?style=for-the-badge&logo=next.js&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-## Características
-- Autenticación con token (guardado en `localStorage`).
-- Consumo de API centralizado con Axios (`lib/api.ts`).
-- UI moderna con componentes reutilizables (`components/`).
-- Soporte de temas (dark/light) y diseño responsivo.
+[![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge)](http://makeapullrequest.com)
+[![GitHub stars](https://img.shields.io/github/stars/dariverap/parking-system-frontend?style=for-the-badge)](https://github.com/dariverap/parking-system-frontend/stargazers)
 
-- Selector de mapa para parkings (MapPicker): en `app/parkings/page.tsx`, al crear/editar un parking, se puede elegir el punto en un mapa (Leaflet + OpenStreetMap) o usar la ubicación actual del navegador. Las coordenadas (`latitud`, `longitud`) se rellenan automáticamente.
-- Validaciones y sanitización en formularios: se usan utilidades compartidas en `lib/validators.ts` para restringir campos (solo letras para nombres, solo números para teléfonos/DNI, decimales con 2 dígitos, rangos de lat/lng, etc.).
-- Filtrado visual por rol: para usuarios `admin_parking`, las vistas solo muestran parkings asignados (el backend también valida permisos con middleware, pero aquí se aplica una restricción UI adicional).
+*🌟 Panel de administración web para gestión completa de estacionamientos*
 
-## Tech Stack
-- Next.js 14
-- React 18
-- Tailwind CSS 4
-- Radix UI / shadcn-ui (componentes)
-- Axios
-- Zod (validaciones internas de Next) + validadores propios (`lib/validators.ts`)
+[📖 Documentación](#-documentación) • [🚀 Instalación](#-instalación) • [🎯 Características](#-características) • [🤝 Contribuir](#-cómo-contribuir)
 
-## Requisitos
-- Node.js >= 18
-- pnpm o npm (recomendado pnpm)
+</div>
 
-## Scripts
-- `pnpm dev` (o `npm run dev`): Levanta el entorno de desarrollo.
-- `pnpm build` (o `npm run build`): Construye la app para producción.
-- `pnpm start` (o `npm run start`): Sirve la app construida.
-- `pnpm lint` (o `npm run lint`): Linter de Next.js.
+---
 
-## Variables de entorno
-Este proyecto utiliza variables expuestas al navegador con prefijo `NEXT_PUBLIC_`.
+## 📋 Descripción del Proyecto
 
-Archivo de ejemplo: `.env.example`
+**Parking Management System - Frontend Web** es la interfaz de administración web del sistema completo de gestión de estacionamientos desarrollado para el curso de **Curso Integrador II: Sistemas** de la **UTP**. Construida con las últimas tecnologías web, ofrece una experiencia de usuario intuitiva y moderna para la gestión diaria de parkings, empleados, reservas y facturación.
 
-```
-# URL base del backend o gateway de APIs
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
-```
+Este frontend forma parte del sistema completo **Parking Management System**:
+- 🖥️ **Frontend Web** (este proyecto) - Panel de administración
+- 🔧 **Backend API** - API RESTful con Node.js
+- 📱 **Mobile App** - App móvil para usuarios finales
 
-- Copia `.env.example` a `.env.local` o `.env` y ajusta los valores para tu entorno.
-- En tiempo de ejecución, el cliente HTTP (Axios) usa `NEXT_PUBLIC_API_URL` (ver `lib/api.ts`). Si no se define, por defecto usa `http://localhost:3000/api`.
+### 🎯 ¿Qué puedes hacer con Parking Management System?
 
-## Estructura del proyecto (parcial)
-```
-app/
-  login/
-  forgot-password/
-  employees/
-  parkings/
-  billing/
-components/
-  ui/
-lib/
-  api.ts
-  auth.ts
-  validators.ts
-  employees.ts
-  parkings.ts
-styles/
-  globals.css
-```
+- 👥 **Gestión de Empleados**: Alta, baja y administración de personal
+- 🅿️ **Administración de Parkings**: Crear y gestionar múltiples estacionamientos
+- 💰 **Sistema de Tarifas**: Configurar precios por hora, día o tipo de vehículo
+- 📊 **Dashboard en Tiempo Real**: Métricas de ocupación, ingresos y estadísticas
+- 🔐 **Control de Accesos**: Sistema de roles y permisos granulares
+- 📍 **Mapas Interactivos**: Ubicación geográfica de parkings con Leaflet
 
-## Desarrollo
-1. Instalar dependencias:
-   ```bash
-   pnpm install
-   # o
-   npm install
-   ```
-2. Preparar variables de entorno:
-   ```bash
-   cp .env.example .env.local
-   # editar .env.local con tus valores
-   ```
-3. Ejecutar en modo dev:
-   ```bash
-   pnpm dev
-   # o
-   npm run dev
-   ```
+---
 
-La app estará disponible por defecto en `http://localhost:3000`.
+## 🎓 Información del Proyecto
 
-### Configuración de API
-- Define `NEXT_PUBLIC_API_URL` apuntando al backend. Ejemplo: `http://localhost:3001/api` si tu API corre en 3001.
-- El cliente HTTP (`lib/api.ts`) añade el token a `Authorization` si existe en `localStorage`.
+**🏫 Universidad**: Universidad Tecnológica del Perú (UTP)  
+**� Carrera**: Ingeniería de Sistemas  
+**� Curso**: Curso Integrador II: Sistemas  
+**👨‍🏫 Profesora**: CLAUDIA YOLANDA VILLALTA FLORES  
+**📅 Año**: 2025  
+**👥 Equipo**: Estudiantes de Ingeniería de Sistemas  
 
-### Roles y comportamiento UI
-- `admin_general`: acceso completo a vistas y acciones.
-- `admin_parking`: ve y gestiona únicamente parkings asignados (UI filtrada + middleware backend).
-- `empleado`/`cliente`: vistas limitadas según permisos.
+Este proyecto es parte del portafolio académico desarrollado durante el curso de **Curso Integrador II: Sistemas**, demostrando la aplicación práctica de conceptos aprendidos en desarrollo web, APIs RESTful, bases de datos y arquitectura de software.
 
-## Construcción y producción
+---
+
+## ✨ Características Principales
+
+<div align="center">
+
+| 🚀 **Rendimiento** | 🎨 **UI/UX** | 🔒 **Seguridad** | 📱 **Responsive** |
+|:---:|:---:|:---:|:---:|
+| Next.js 14 App Router | Shadcn/ui + Tailwind | JWT Authentication | Mobile-first Design |
+| Server Components | Tema Dark/Light | Role-based Access | Progressive Web App |
+| Optimized Bundling | Loading States | Secure API Calls | Cross-browser |
+
+</div>
+
+### 🔧 Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Lenguaje**: TypeScript
+- **Styling**: Tailwind CSS + Shadcn/ui
+- **HTTP Client**: Axios con interceptores
+- **Maps**: Leaflet (CDN) + OpenStreetMap
+- **Forms**: React Hook Form + Zod validation
+- **State**: React Hooks + Context API
+- **Icons**: Lucide React
+
+---
+
+## 🚀 Instalación y Configuración
+
+### 📋 Prerrequisitos
+
+- Node.js >= 18.0.0
+- pnpm, npm o yarn
+- API Backend corriendo (ver [Backend API](https://github.com/dariverap/parking-system-api))
+
+### ⚡ Instalación Rápida
+
 ```bash
-pnpm build
-pnpm start
+# 1. Clonar el repositorio
+git clone https://github.com/dariverap/front-web-parking.git
+cd front-web-parking
+
+# 2. Instalar dependencias
+pnpm install
+# o
+npm install
+
+# 3. Configurar variables de entorno
+cp .env.example .env.local
+
+# 4. Editar .env.local con tus valores
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+
+# 5. Ejecutar en desarrollo
+pnpm dev
+# o
+npm run dev
 ```
 
-## Linting
-```bash
-pnpm lint
+### 🔧 Variables de Entorno
+
+Crea un archivo `.env.local` en la raíz del proyecto:
+
+```env
+# URL base del backend API
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+
+# Opcional: Configuración de mapas
+NEXT_PUBLIC_MAPS_API_KEY=your_maps_api_key
 ```
 
-## Notas de seguridad
-- Nunca subas tus credenciales reales al repositorio. Usa `.env.local` y conserva `.env.example` con valores dummy.
-- El token de sesión se almacena en `localStorage` para las peticiones autenticadas (ver interceptor en `lib/api.ts`). Ajusta la estrategia si requieres mayor seguridad (cookies httpOnly, etc.).
+### 📱 Scripts Disponibles
 
-## Convenciones
-- Componentes reutilizables en `components/`.
-- Clientes y utilidades en `lib/`.
-- Rutas y páginas en `app/` (App Router de Next.js).
+```json
+{
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start",
+  "lint": "next lint",
+  "type-check": "tsc --noEmit"
+}
+```
 
-## Despliegue
-- Este proyecto puede desplegarse fácilmente en Vercel o Netlify.
-- Asegúrate de configurar `NEXT_PUBLIC_API_URL` en las variables de entorno del proveedor.
+---
 
-## Licencia
-Propietario del proyecto. Si necesitas agregar una licencia OSS (MIT, Apache-2.0, etc.), indícalo.
+## 🎯 Uso y Navegación
 
-## Visión del proyecto
-El objetivo de este frontend es permitir la operación diaria de un sistema de estacionamiento con una interfaz clara y eficiente, minimizando errores operativos y acelerando tareas repetitivas como check-in/check-out de vehículos, cálculo de tarifas y gestión de empleados.
+### 🔐 Roles de Usuario
 
-## Módulos funcionales
-- **Dashboard (futuro):** métricas en tiempo real (ocupación, ingresos diarios, tickets abiertos).
-- **Parking:**
-  - Registro de ingreso/salida de vehículos.
-  - Cálculo de tarifas según reglas (por hora, fracción, estadías, validaciones).
-  - Búsqueda por patente/placa, ticket o cochera.
-- **Empleados:**
-  - Alta/baja/modificación de usuarios operativos.
-  - Asignación de roles y permisos.
-- **Facturación / Billing:**
-  - Emisión de tickets/boletas.
-  - Reportes por rango de fechas.
-  - Exportación (CSV/Excel) futuro.
+| Rol | Descripción | Permisos |
+|:---:|:---:|:---:|
+| 👑 **admin_general** | Super administrador | Acceso completo a todo |
+| 🏢 **admin_parking** | Admin de parking específico | Gestión de su parking asignado |
+| 👷 **empleado** | Empleado operativo | Check-in/out, consultas básicas |
+| 👤 **cliente** | Usuario final | Solo app móvil |
 
-## Roles y permisos (sugerencia)
-- **Administrador:** Acceso a todos los módulos y reportes; gestiona empleados y tarifas.
-- **Operador:** Alta/baja de tickets, cobros y consultas básicas.
+### 🗺️ Rutas Principales
 
-## Navegación principal
-Rutas actuales basadas en `app/`:
-- `/login` → Autenticación.
-- `/forgot-password` → Recuperación de contraseña.
-- `/employees` → Gestión de empleados.
-- `/billing` → Facturación y cobros.
-- `/` (por definir) → Dashboard o landing interna.
+- `/login` - Autenticación
+- `/my-parkings` - Lista de parkings
+- `/my-parkings/[id]` - Dashboard de parking específico
+- `/employees` - Gestión de empleados
+- `/settings` - Configuración de cuenta
 
-## Flujo de autenticación (resumen)
+---
+
+## 🏗️ Arquitectura del Proyecto
+
+### 📁 Estructura de Directorios
+
+```
+front-web-parking/
+├── app/                    # Next.js App Router
+│   ├── (auth)/            # Rutas de autenticación
+│   ├── my-parkings/       # Gestión de parkings
+│   ├── employees/         # Gestión de empleados
+│   └── globals.css        # Estilos globales
+├── components/            # Componentes reutilizables
+│   ├── ui/               # Componentes base (shadcn)
+│   ├── auth-guard.tsx    # Protección de rutas
+│   └── breadcrumbs.tsx   # Navegación
+├── lib/                  # Utilidades y configuración
+│   ├── api.ts           # Cliente HTTP
+│   ├── auth.ts          # Lógica de autenticación
+│   └── validators.ts    # Validaciones de formularios
+├── hooks/               # Custom hooks
+├── public/              # Assets estáticos
+└── styles/             # Estilos adicionales
+```
+
+### 🔄 Flujo de Autenticación
+
 ```mermaid
 flowchart LR
-  A[Usuario] --> B[/login]
-  B -->|POST /auth/login| C{Credenciales válidas?}
-  C -->|Sí| D[Guardar token en localStorage]
-  D --> E[Navegación a app privada]
-  C -->|No| F[Mostrar error]
+    A[Usuario] --> B[/login]
+    B -->|POST /auth/login| C{Credenciales válidas?}
+    C -->|Sí| D[Guardar token en localStorage]
+    D --> E[Navegación a app privada]
+    C -->|No| F[Mostrar error]
 ```
 
-El token se inyecta automáticamente en cada request por el interceptor Axios (`lib/api.ts`).
+---
 
-## Arquitectura del proyecto (relación con API)
-```mermaid
-graph TD
-  A[Front Next.js] -->|HTTP| B[API Node/Express]
-  B --> C[Supabase/Postgres]
-```
+## 🤝 Cómo Contribuir
 
-## Funcionalidades destacadas
-- **MapPicker**: `app/parkings/page.tsx` incluye un mapa interactivo (Leaflet via CDN) que permite hacer clic para fijar coordenadas y sincroniza con los inputs. La opción "Usar mi ubicación" permanece disponible.
-- **Validadores compartidos**: `lib/validators.ts` provee `lettersOnly`, `digitsOnly`, `decimal2`, `isValidName`, `isValidPhone`, `isValidEmail`. Se usan en Parkings, Users, Employees y Register.
+¡Las contribuciones son bienvenidas! 🎉
 
-## Endpoints de ejemplo (backend esperado)
-Los endpoints se construyen sobre `NEXT_PUBLIC_API_URL`.
-- `POST /auth/login` → Body: `{ email, password }` → Respuesta: `{ token }`.
-- `GET /employees` → Lista de empleados.
-- `POST /employees` → Crear empleado.
-- `GET /parkings/:id` → Detalle de ticket/estancia.
-- `POST /billing/charge` → Cobro de ticket.
+### 📝 Guía de Contribución
 
-> Nota: Estos endpoints son de referencia. Ajusta nombres y payloads según tu backend real.
+1. **Fork** el proyecto
+2. **Crea** una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. **Commit** tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. **Push** a la rama (`git push origin feature/AmazingFeature`)
+5. **Abre** un Pull Request
 
-## Estados y manejo de errores
-- **Cargando:** Pantallas `loading.tsx` en `app/*` para feedback inmediato.
-- **Errores de red/401:** Redirección a `/login` o notificación. Revisar interceptor y manejo de toasts.
-- **Estados vacíos:** Tablas/listas con placeholders y CTAs para crear registros.
+### 🐛 Reportar Issues
 
-    
-## Arquitectura Frontend (alto nivel)
-```mermaid
-graph TD
-  A[App Router - app/] --> B[Pages/Routes]
-  B --> C[Components - UI]
-  B --> D[lib/ api.ts, auth.ts, ...]
-  D --> E[Axios Interceptor]
-  E --> F[Backend API]
-  C --> G[Styles Tailwind]
-```
+Si encuentras un bug o tienes una sugerencia:
 
-## Roadmap (propuesto)
-- [ ] Dashboard con métricas (ocupación, ingresos, tickets activos).
-- [ ] Gestión de tarifas/planes.
-- [ ] Búsqueda avanzada y filtros por tiempo/sector.
-- [ ] Exportación de reportes (CSV/Excel).
-- [ ] Tests E2E y unitarios.
-- [ ] Internacionalización (i18n).
+1. Ve a [Issues](https://github.com/dariverap/front-web-parking/issues)
+2. Crea un nuevo issue con el template correspondiente
+3. Proporciona detalles claros y pasos para reproducir
 
-## FAQ
-- **¿Dónde configuro la URL del backend?** En `.env.local` usando `NEXT_PUBLIC_API_URL`.
-- **¿Puedo usar cookies httpOnly en vez de localStorage?** Sí, pero requerirá ajustes en el backend y en el flujo de autenticación.
-- **¿Se puede desplegar en Vercel?** Sí. Configura las variables en el panel del proveedor.
+### 📋 Estándares de Código
+
+- Usa TypeScript estrictamente
+- Sigue las convenciones de ESLint
+- Escribe commits descriptivos
+- Mantén la cobertura de tests
+
+---
+
+## 👥 Colaboradores
+
+<div align="center">
+
+| [<img src="https://github.com/dariverap.png" width="100px;"><br><sub><b>Diego Rivera</b></sub>](https://github.com/dariverap)<br><sub>🚀 Desarrollador Frontend & Arquitecto</sub> | [<img src="https://github.com/utp-student.png" width="100px;"><br><sub><b>Estudiante UTP</b></sub>](https://github.com/utp-student)<br><sub>🤝 Colaborador Backend</sub> |
+|:---:|:---:|
+
+**Proyecto desarrollado como parte del curso Curso Integrador II: Sistemas - UTP**
+
+</div>
+
+---
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## 🙋‍♂️ FAQ
+
+### ❓ ¿Dónde configuro la URL del backend?
+En el archivo `.env.local` usando la variable `NEXT_PUBLIC_API_URL`.
+
+### ❓ ¿Puedo usar cookies httpOnly en vez de localStorage?
+Sí, pero requerirá ajustes en el backend y en el flujo de autenticación.
+
+### ❓ ¿Se puede desplegar en Vercel?
+Sí, configura las variables de entorno en el panel de Vercel.
+
+### ❓ ¿Cómo cambio el tema de la aplicación?
+La aplicación soporta tema claro/oscuro automáticamente según las preferencias del sistema.
+
+---
+
+## 🚀 Roadmap
+
+- [ ] 📊 Dashboard con métricas avanzadas
+- [ ] 💳 Integración con pasarelas de pago
+- [ ] 📱 Notificaciones push
+- [ ] 🌍 Internacionalización (i18n)
+- [ ] 📈 Reportes avanzados con gráficos
+- [ ] 🔍 Búsqueda global con filtros
+- [ ] 📧 Sistema de correos electrónicos
+- [ ] 🎫 Sistema de tickets/reservas online
+
+---
+
+## 📞 Soporte Académico
+
+- 📧 **Email**: diego.rivera@utp.edu.pe
+- 💬 **Issues**: [GitHub Issues](https://github.com/dariverap/parking-system-frontend/issues)
+- 📚 **Universidad**: Universidad Tecnológica del Perú (UTP)
+- 📖 **Curso**: Curso Integrador II: Sistemas
+- 👨‍🏫 **Profesora**: CLAUDIA YOLANDA VILLALTA FLORES
+
+---
+
+<div align="center">
+
+**Proyecto académico desarrollado con ❤️ para el curso Curso Integrador II: Sistemas - UTP**
+
+⭐ ¡Gracias por revisar nuestro proyecto!
+
+[⬆️ Volver al inicio](#-parking-management-system---frontend-web)
+
+</div>
