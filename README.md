@@ -185,9 +185,9 @@ front-web-parking/
 ```mermaid
 flowchart LR
     A[Usuario] --> B[/login]
-    B -->|POST /auth/login| C{Credenciales válidas?}
-    C -->|Sí| D[Guardar token en localStorage]
-    D --> E[Navegación a app privada]
+    B --> C{Login valido?}
+    C -->|Si| D[Guardar token]
+    D --> E[Navegacion privada]
     C -->|No| F[Mostrar error]
 ```
 
