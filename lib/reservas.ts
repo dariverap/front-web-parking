@@ -40,6 +40,7 @@ export interface OcupacionRecord {
   id_vehiculo?: string;
   hora_entrada: string;
   hora_salida?: string;
+  hora_salida_solicitada?: string | null;
   tiempo_total?: number;
   monto_calculado?: number;
   costo_total?: number;
@@ -178,7 +179,7 @@ export async function listOcupacionesActivas(
  */
 export async function confirmarEntrada(idReserva: string): Promise<OcupacionRecord> {
   try {
-    const response = await api.post("/ocupaciones/entrada", {
+    const response = await api.post("/ocupaciones/marcar-entrada", {
       id_reserva: idReserva
     });
     
@@ -254,6 +255,28 @@ export async function listAllOcupaciones(): Promise<OcupacionRecord[]> {
   } catch (error: any) {
     console.error("Error al obtener ocupaciones:", error);
     throw new Error(error.response?.data?.message || "Error al obtener ocupaciones");
+  }
+}
+
+/**
+ * Obtener historial de ocupaciones finalizadas de un parking
+ * @param parkingId - ID del parking
+ */
+export async function listHistorialOcupaciones(
+  parkingId: string
+): Promise<OcupacionRecord[]> {
+  try {
+    const response = await api.get("/ocupaciones/historial", {
+      params: { id_parking: parkingId }
+    });
+    
+    if (response.data?.success && Array.isArray(response.data.data)) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error: any) {
+    console.error("Error al obtener historial de ocupaciones:", error);
+    throw new Error(error.response?.data?.message || "Error al obtener historial");
   }
 }
 

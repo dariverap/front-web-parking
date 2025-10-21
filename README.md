@@ -115,7 +115,7 @@ Crea un archivo `.env.local` en la raíz del proyecto:
 
 ```env
 # URL base del backend API
-NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
 
 # Opcional: Configuración de mapas
 NEXT_PUBLIC_MAPS_API_KEY=your_maps_api_key

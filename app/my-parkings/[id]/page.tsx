@@ -15,7 +15,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { ClipboardList, Car, ParkingCircle, DollarSign, Percent, Clock, Plus, Edit, Trash2, RefreshCcw, Lock, Unlock, CheckCircle2, AlertCircle, X, LogOut } from "lucide-react"
 import { listTarifasByParking, createTarifa, updateTarifa, deleteTarifa, type TarifaRecord } from "@/lib/tarifas"
 import { listSpacesByParking, toggleSpaceEnabled, type SpaceRecord } from "@/lib/spaces"
-import { listReservasByParking, listOcupacionesActivas, confirmarEntrada, registrarSalida, type ReservaRecord, type OcupacionRecord } from "@/lib/reservas"
+import { listReservasByParking, listOcupacionesActivas, listHistorialOcupaciones, confirmarEntrada, registrarSalida, type ReservaRecord, type OcupacionRecord } from "@/lib/reservas"
+import { listPagosPendientesByParking, listAllPagos, validarPago, type PagoPendiente, type PagoRecord } from "@/lib/pagos"
+import PaymentModal from "@/components/PaymentModal"
 
 export default function ParkingManagementPage() {
   const params = useParams()
@@ -63,6 +65,18 @@ export default function ParkingManagementPage() {
   const [reservaError, setReservaError] = useState("")
   const [confirmandoEntrada, setConfirmandoEntrada] = useState<string | null>(null)
   const [registrandoSalida, setRegistrandoSalida] = useState<string | null>(null)
+
+  // ========== PAGOS STATE ==========
+  const [pagosPendientes, setPagosPendientes] = useState<PagoPendiente[]>([])
+  const [pagosHoy, setPagosHoy] = useState<PagoRecord[]>([])
+  const [historialOcupaciones, setHistorialOcupaciones] = useState<OcupacionRecord[]>([])
+  const [pLoading, setPLoading] = useState(false)
+  const [pagoError, setPagoError] = useState("")
+  const [validandoPago, setValidandoPago] = useState<string | null>(null)
+
+  // ========== PAYMENT MODAL STATE ==========
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
+  const [selectedOcupacion, setSelectedOcupacion] = useState<OcupacionRecord | null>(null)
 
   // ========== STATISTICS ==========
   const [stats, setStats] = useState({
@@ -234,7 +248,11 @@ export default function ParkingManagementPage() {
         listOcupacionesActivas(parkingId)
       ])
       
-      setReservas([...reservasActivas, ...reservasPendientes])
+      // Filtrar reservas activas que ya tienen ocupación para evitar duplicados
+      const ocupacionesReservaIds = new Set(ocupacionesActivas.map(o => o.id_reserva).filter(Boolean))
+      const reservasSinOcupacion = reservasActivas.filter(r => !ocupacionesReservaIds.has(r.id_reserva))
+      
+      setReservas([...reservasSinOcupacion, ...reservasPendientes])
       setOcupaciones(ocupacionesActivas)
     } catch (err: any) {
       setReservaError(err?.message || "Error al cargar reservas")
@@ -260,18 +278,72 @@ export default function ParkingManagementPage() {
   }
 
   const handleMarcarSalida = async (idOcupacion: string) => {
-    if (!window.confirm("¿Marcar salida del vehículo? Se calculará el monto a cobrar.")) return
-    setRegistrandoSalida(idOcupacion)
-    setReservaError("")
+    // Buscar la ocupación completa
+    const ocupacion = ocupaciones.find(o => o.id_ocupacion === idOcupacion)
+    if (!ocupacion) {
+      setReservaError("No se encontró la ocupación")
+      return
+    }
+    
+    // Abrir modal de pago
+    setSelectedOcupacion(ocupacion)
+    setIsPaymentModalOpen(true)
+  }
+
+  const handlePaymentSuccess = async () => {
+    // Recargar datos después de procesar el pago
+    await Promise.all([
+      reloadReservas(),
+      reloadSpaces(),
+      reloadPagos()
+    ])
+  }
+
+  // ========== PAGOS HANDLERS ==========
+  const reloadPagos = useCallback(async () => {
+    if (!parkingId) return
+    setPLoading(true)
+    setPagoError("")
     try {
-      const resultado = await registrarSalida(idOcupacion)
-      alert(`Salida registrada. Monto: S/. ${resultado.monto_calculado?.toFixed(2) || 0}`)
-      await reloadReservas()
-      await reloadSpaces() // Actualizar estado de espacios
+      // Cargar pagos pendientes
+      const pendientes = await listPagosPendientesByParking(parkingId)
+      setPagosPendientes(pendientes)
+      
+      // Cargar pagos completados del día actual para calcular ingresos
+      const hoy = new Date().toISOString().split('T')[0]
+      const todosLosPagos = await listAllPagos({ id_parking: parkingId })
+      const pagosDelDia = todosLosPagos.filter(p => {
+        if (p.estado !== 'COMPLETADO') return false
+        const fechaPago = new Date(p.created_at).toISOString().split('T')[0]
+        return fechaPago === hoy
+      })
+      setPagosHoy(pagosDelDia)
+      
+      // Cargar historial de ocupaciones para calcular tiempo promedio
+      const historial = await listHistorialOcupaciones(parkingId)
+      setHistorialOcupaciones(historial)
     } catch (err: any) {
-      setReservaError(err?.message || "Error al registrar salida")
+      setPagoError(err?.message || "Error al cargar datos de pagos")
+      console.error(err)
     } finally {
-      setRegistrandoSalida(null)
+      setPLoading(false)
+    }
+  }, [parkingId])
+
+  const handleValidarPago = async (idPago: string) => {
+    if (!window.confirm("¿Confirmar validación del pago? Se liberará el espacio.")) return
+    setValidandoPago(idPago)
+    setPagoError("")
+    try {
+      await validarPago(idPago)
+      // Refrescar primero pagos para ocultar el botón, luego reservas/espacios
+      await reloadPagos()
+      await Promise.all([reloadReservas(), reloadSpaces()])
+      alert("Pago validado exitosamente. El espacio ha sido liberado.")
+    } catch (err: any) {
+      setPagoError(err?.message || "Error al validar pago")
+    } finally {
+      setValidandoPago(null)
     }
   }
 
@@ -282,10 +354,10 @@ export default function ParkingManagementPage() {
     const ocupados = spaces.filter(s => s.estado === 'ocupado').length
     const ocupacionPercent = total > 0 ? Math.round((ocupados / total) * 100) : 0
     
-    // Calcular tiempo promedio de ocupaciones (solo las que tienen salida)
+    // Calcular tiempo promedio desde el historial de ocupaciones (no las activas)
     let tiempoPromedio = "0h 0m"
-    if (ocupaciones.length > 0) {
-      const ocupacionesConTiempo = ocupaciones.filter(o => o.hora_salida && o.tiempo_total)
+    if (historialOcupaciones.length > 0) {
+      const ocupacionesConTiempo = historialOcupaciones.filter(o => o.tiempo_total && o.tiempo_total > 0)
       if (ocupacionesConTiempo.length > 0) {
         const totalMinutos = ocupacionesConTiempo.reduce((sum, o) => sum + (o.tiempo_total || 0), 0)
         const promedioMinutos = Math.round(totalMinutos / ocupacionesConTiempo.length)
@@ -295,15 +367,8 @@ export default function ParkingManagementPage() {
       }
     }
     
-    // Calcular ingresos del día (solo ocupaciones con monto)
-    const hoy = new Date().toISOString().split('T')[0]
-    const ingresosHoy = ocupaciones
-      .filter(o => {
-        if (!o.hora_entrada) return false
-        const fechaEntrada = new Date(o.hora_entrada).toISOString().split('T')[0]
-        return fechaEntrada === hoy && o.costo_total
-      })
-      .reduce((sum, o) => sum + (o.costo_total || o.monto_calculado || 0), 0)
+    // Calcular ingresos del día desde pagos COMPLETADOS
+    const ingresosHoy = pagosHoy.reduce((sum, pago) => sum + (pago.monto || 0), 0)
     
     setStats({
       reservasActivas: reservas.length,
@@ -313,7 +378,7 @@ export default function ParkingManagementPage() {
       ocupacion: ocupacionPercent,
       tiempoPromedio
     })
-  }, [spaces, reservas, ocupaciones])
+  }, [spaces, reservas, ocupaciones, pagosHoy, historialOcupaciones])
 
   // ========== INITIAL LOAD ==========
   useEffect(() => {
@@ -321,8 +386,9 @@ export default function ParkingManagementPage() {
       void reloadTarifas()
       void reloadSpaces()
       void reloadReservas()
+      void reloadPagos()
     }
-  }, [parkingId, reloadTarifas, reloadSpaces, reloadReservas])
+  }, [parkingId, reloadTarifas, reloadSpaces, reloadReservas, reloadPagos])
 
   const breadcrumbs = [
     { label: "Inicio", href: "/" },
@@ -565,6 +631,8 @@ export default function ParkingManagementPage() {
                                 minute: '2-digit'
                               })
                               const estaBusy = registrandoSalida === o.id_ocupacion
+                              // Si ya hay salida solicitada (pago pendiente debe existir), no mostrar 'Marcar salida'
+                              const salidaSolicitada = !!o.hora_salida_solicitada || (!!o.monto_calculado && (o.tiempo_total || 0) > 0)
 
                               return (
                                 <TableRow key={o.id_ocupacion}>
@@ -586,15 +654,17 @@ export default function ParkingManagementPage() {
                                     <Badge variant="secondary">{o.numero_espacio || "N/A"}</Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Button 
-                                      size="sm"
-                                      className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-sm hover:shadow-md transition-all duration-200"
-                                      disabled={estaBusy}
-                                      onClick={() => void handleMarcarSalida(o.id_ocupacion)}
-                                    >
-                                      <LogOut className="h-4 w-4 mr-1.5" />
-                                      {estaBusy ? 'Procesando...' : 'Marcar Salida'}
-                                    </Button>
+                                    {!salidaSolicitada && (
+                                      <Button 
+                                        size="sm"
+                                        className="bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                                        disabled={estaBusy}
+                                        onClick={() => void handleMarcarSalida(o.id_ocupacion)}
+                                      >
+                                        <LogOut className="h-4 w-4 mr-1.5" />
+                                        {estaBusy ? 'Procesando...' : 'Marcar Salida'}
+                                      </Button>
+                                    )}
                                   </TableCell>
                                 </TableRow>
                               )
@@ -611,6 +681,108 @@ export default function ParkingManagementPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* PAGOS PENDIENTES - COMENTADO (flujo simplificado ya no lo usa) */}
+                  {/* 
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-amber-500" />
+                        Pagos Pendientes de Validación
+                      </CardTitle>
+                      <Button variant="ghost" size="icon" onClick={() => void reloadPagos()} disabled={pLoading}>
+                        <RefreshCcw className="h-4 w-4" />
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      {pLoading ? (
+                        <p className="text-sm text-muted-foreground">Cargando pagos...</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Usuario</TableHead>
+                                <TableHead>Vehículo</TableHead>
+                                <TableHead>Espacio</TableHead>
+                                <TableHead>Tiempo</TableHead>
+                                <TableHead>Monto</TableHead>
+                                <TableHead>Hora Salida Solicitada</TableHead>
+                                <TableHead className="text-right">Acciones</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {pagosPendientes.map(p => {
+                                const horaSalida = p.hora_salida_solicitada 
+                                  ? new Date(p.hora_salida_solicitada).toLocaleString('es-PE', {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })
+                                  : "N/A"
+                                const estaBusy = validandoPago === p.id_pago
+                                const tiempoMinutos = p.tiempo_total_minutos || 0
+                                const horas = Math.floor(tiempoMinutos / 60)
+                                const minutos = tiempoMinutos % 60
+                                const tiempoStr = `${horas}h ${minutos}m`
+
+                                return (
+                                  <TableRow key={p.id_pago}>
+                                    <TableCell className="font-medium">
+                                      {p.nombre_usuario || "N/A"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{p.placa || "N/A"}</span>
+                                        {p.marca && (
+                                          <span className="text-xs text-muted-foreground">
+                                            {p.marca} {p.modelo}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant="secondary">{p.numero_espacio || "N/A"}</Badge>
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium">
+                                      {tiempoStr}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-bold text-green-600">
+                                      S/. {p.monto?.toFixed(2) || "0.00"}
+                                    </TableCell>
+                                    <TableCell className="text-sm">{horaSalida}</TableCell>
+                                    <TableCell className="text-right">
+                                      <Button 
+                                        size="sm"
+                                        className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                                        disabled={estaBusy}
+                                        onClick={() => void handleValidarPago(p.id_pago)}
+                                      >
+                                        <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                                        {estaBusy ? 'Validando...' : 'Validar Pago'}
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                              {pagosPendientes.length === 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
+                                    No hay pagos pendientes de validación
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                      {pagoError && (
+                        <div className="mt-3 text-sm text-red-600">{pagoError}</div>
+                      )}
+                    </CardContent>
+                  </Card>
+                  */}
                 </TabsContent>
 
                 {/* TAB: TARIFAS */}
@@ -891,6 +1063,16 @@ export default function ParkingManagementPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+
+              {/* Payment Modal */}
+              {selectedOcupacion && (
+                <PaymentModal
+                  isOpen={isPaymentModalOpen}
+                  onClose={() => setIsPaymentModalOpen(false)}
+                  ocupacion={selectedOcupacion}
+                  onSuccess={handlePaymentSuccess}
+                />
+              )}
             </>
           ) : null}
         </div>
