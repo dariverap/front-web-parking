@@ -304,27 +304,71 @@ export default function ParkingManagementPage() {
     if (!parkingId) return
     setPLoading(true)
     setPagoError("")
+    console.log('[DEBUG] === INICIO reloadPagos ===', { parkingId })
     try {
       // Cargar pagos pendientes
+      console.log('[DEBUG] Cargando pagos pendientes...')
       const pendientes = await listPagosPendientesByParking(parkingId)
+      console.log('[DEBUG] Pagos pendientes cargados:', pendientes.length)
       setPagosPendientes(pendientes)
       
       // Cargar pagos completados del día actual para calcular ingresos
-      const hoy = new Date().toISOString().split('T')[0]
+      console.log('[DEBUG] Cargando todos los pagos del parking...')
+      // Usar fecha local en lugar de UTC para evitar problemas de zona horaria
+      const ahora = new Date()
+      const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`
       const todosLosPagos = await listAllPagos({ id_parking: parkingId })
-      const pagosDelDia = todosLosPagos.filter(p => {
-        if (p.estado !== 'COMPLETADO') return false
-        const fechaPago = new Date(p.created_at).toISOString().split('T')[0]
-        return fechaPago === hoy
-      })
+      console.log('[DEBUG] Todos los pagos del parking:', todosLosPagos.length)
+      console.log('[DEBUG] Fecha de hoy (LOCAL):', hoy)
+      console.log('[DEBUG] Estructura del primer pago:', JSON.stringify(todosLosPagos[0], null, 2))
+      
+      const pagosDelDia = []
+      
+      for (const p of todosLosPagos) {
+        try {
+          // Normalizar estado
+          const estadoNormalizado = (p.estado || '').toUpperCase()
+          
+          // Extraer fecha
+          const fechaRaw = p.fecha_pago || p.emitido_en
+          if (!fechaRaw) {
+            console.warn('[DEBUG] Pago sin fecha:', p.id_pago)
+            continue
+          }
+          
+          const fechaPago = new Date(fechaRaw).toISOString().split('T')[0]
+          
+          const esCompletado = estadoNormalizado === 'COMPLETADO'
+          const esHoy = fechaPago === hoy
+          
+          console.log('[DEBUG] Pago #' + p.id_pago + ':', {
+            estado: estadoNormalizado,
+            fecha: fechaPago,
+            hoy: hoy,
+            esCompletado,
+            esHoy,
+            pasaFiltro: esCompletado && esHoy
+          })
+          
+          if (esCompletado && esHoy) {
+            pagosDelDia.push(p)
+          }
+        } catch (err) {
+          console.error('[DEBUG] Error procesando pago:', p.id_pago, err)
+        }
+      }
+      
+      console.log('[DEBUG] Pagos completados hoy:', pagosDelDia.length, pagosDelDia)
       setPagosHoy(pagosDelDia)
       
       // Cargar historial de ocupaciones para calcular tiempo promedio
       const historial = await listHistorialOcupaciones(parkingId)
+      console.log('[DEBUG] Historial de ocupaciones:', historial.length, historial.slice(0, 3))
       setHistorialOcupaciones(historial)
     } catch (err: any) {
+      console.error('[DEBUG] ❌ ERROR en reloadPagos:', err)
+      console.error('[DEBUG] Error stack:', err?.stack)
       setPagoError(err?.message || "Error al cargar datos de pagos")
-      console.error(err)
     } finally {
       setPLoading(false)
     }
@@ -357,18 +401,30 @@ export default function ParkingManagementPage() {
     // Calcular tiempo promedio desde el historial de ocupaciones (no las activas)
     let tiempoPromedio = "0h 0m"
     if (historialOcupaciones.length > 0) {
-      const ocupacionesConTiempo = historialOcupaciones.filter(o => o.tiempo_total && o.tiempo_total > 0)
+      // Filtrar ocupaciones que tienen tiempo_total válido (puede ser tiempo_total o tiempo_total_minutos)
+      const ocupacionesConTiempo = historialOcupaciones.filter(o => {
+        const tiempo = o.tiempo_total || o.tiempo_total_minutos || 0
+        return tiempo > 0
+      })
+      
+      console.log('[DEBUG] Ocupaciones con tiempo válido:', ocupacionesConTiempo.length)
+      
       if (ocupacionesConTiempo.length > 0) {
-        const totalMinutos = ocupacionesConTiempo.reduce((sum, o) => sum + (o.tiempo_total || 0), 0)
+        const totalMinutos = ocupacionesConTiempo.reduce((sum, o) => {
+          const tiempo = o.tiempo_total || o.tiempo_total_minutos || 0
+          return sum + tiempo
+        }, 0)
         const promedioMinutos = Math.round(totalMinutos / ocupacionesConTiempo.length)
         const horas = Math.floor(promedioMinutos / 60)
         const minutos = promedioMinutos % 60
         tiempoPromedio = `${horas}h ${minutos}m`
+        console.log('[DEBUG] Tiempo promedio calculado:', tiempoPromedio, 'de', totalMinutos, 'minutos totales')
       }
     }
     
     // Calcular ingresos del día desde pagos COMPLETADOS
     const ingresosHoy = pagosHoy.reduce((sum, pago) => sum + (pago.monto || 0), 0)
+    console.log('[DEBUG] Ingresos hoy calculados:', ingresosHoy, 'de', pagosHoy.length, 'pagos')
     
     setStats({
       reservasActivas: reservas.length,

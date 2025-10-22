@@ -25,9 +25,8 @@ export interface PagoRecord {
   estado: 'PENDIENTE' | 'COMPLETADO' | 'CANCELADO';
   comprobante?: string;
   fecha_pago?: string;
+  emitido_en?: string;
   vuelto?: number;
-  created_at: string;
-  updated_at?: string;
 }
 
 /**
