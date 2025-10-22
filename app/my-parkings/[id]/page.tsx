@@ -1,6 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
+import Link from "next/link"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { AuthGuard } from "@/components/auth-guard"
 import { Breadcrumbs } from "@/components/breadcrumbs"
@@ -12,11 +13,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { ClipboardList, Car, ParkingCircle, DollarSign, Percent, Clock, Plus, Edit, Trash2, RefreshCcw, Lock, Unlock, CheckCircle2, AlertCircle, X, LogOut } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ClipboardList, Car, ParkingCircle, DollarSign, Percent, Clock, Plus, Edit, Trash2, RefreshCcw, Lock, Unlock, CheckCircle2, AlertCircle, X, LogOut, Eye, Banknote, Smartphone, CreditCard } from "lucide-react"
 import { listTarifasByParking, createTarifa, updateTarifa, deleteTarifa, type TarifaRecord } from "@/lib/tarifas"
 import { listSpacesByParking, toggleSpaceEnabled, type SpaceRecord } from "@/lib/spaces"
 import { listReservasByParking, listOcupacionesActivas, listHistorialOcupaciones, confirmarEntrada, registrarSalida, type ReservaRecord, type OcupacionRecord } from "@/lib/reservas"
 import { listPagosPendientesByParking, listAllPagos, validarPago, type PagoPendiente, type PagoRecord } from "@/lib/pagos"
+import { listOperationsForParking, buildTimeline, type OperationRecord } from "@/lib/operations"
 import PaymentModal from "@/components/PaymentModal"
 
 export default function ParkingManagementPage() {
@@ -73,6 +76,16 @@ export default function ParkingManagementPage() {
   const [pLoading, setPLoading] = useState(false)
   const [pagoError, setPagoError] = useState("")
   const [validandoPago, setValidandoPago] = useState<string | null>(null)
+
+  // ========== HISTORIAL UNIFICADO ==========
+  const [ops, setOps] = useState<OperationRecord[]>([])
+  const [opsLoading, setOpsLoading] = useState(false)
+  const [opsError, setOpsError] = useState<string>("")
+  const [historialQuery, setHistorialQuery] = useState("")
+  const [fechaDesde, setFechaDesde] = useState("") // yyyy-mm-dd
+  const [fechaHasta, setFechaHasta] = useState("") // yyyy-mm-dd
+  const [estadoFiltro, setEstadoFiltro] = useState<string>("")
+  const [detalleOperacion, setDetalleOperacion] = useState<OperationRecord | null>(null)
 
   // ========== PAYMENT MODAL STATE ==========
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
@@ -393,6 +406,75 @@ export default function ParkingManagementPage() {
     }
   }
 
+  // ========== HISTORIAL UNIFICADO HANDLERS ==========
+  const reloadOperaciones = useCallback(async () => {
+    if (!parkingId) return
+    setOpsLoading(true)
+    setOpsError("")
+    try {
+      const filters: any = {}
+      if (estadoFiltro) filters.estado = estadoFiltro
+      if (fechaDesde) filters.fecha_desde = fechaDesde
+      if (fechaHasta) filters.fecha_hasta = fechaHasta
+      if (historialQuery) filters.q = historialQuery
+
+      const data = await listOperationsForParking(parkingId, filters)
+      setOps(data)
+    } catch (e: any) {
+      setOpsError(e?.message || "Error al cargar historial de operaciones")
+    } finally {
+      setOpsLoading(false)
+    }
+  }, [parkingId, estadoFiltro, fechaDesde, fechaHasta, historialQuery])
+
+  // Estados disponibles - lista completa fija de todos los estados posibles
+  const estadosDisponibles = useMemo(() => {
+    return [
+      'pendiente',
+      'confirmada',
+      'activa',
+      'finalizada',
+      'finalizada_pagada',
+      'cancelada',
+      'expirada',
+      'no_show'
+    ]
+  }, [])
+
+  const colorByEstado = (s: string) => {
+    const up = s.toLowerCase()
+    if (up === "finalizada_pagada") return "bg-emerald-500/10 text-emerald-700 border-emerald-300"
+    if (up === "finalizada") return "bg-violet-500/10 text-violet-700 border-violet-300"
+    if (up === "activa") return "bg-blue-500/10 text-blue-700 border-blue-300"
+    if (up === "pendiente") return "bg-amber-500/10 text-amber-700 border-amber-300"
+    if (up === "confirmada") return "bg-cyan-500/10 text-cyan-700 border-cyan-300"
+    if (up === "cancelada") return "bg-rose-500/10 text-rose-700 border-rose-300"
+    if (up === "expirada") return "bg-slate-500/10 text-slate-700 border-slate-300"
+    if (up === "no_show") return "bg-neutral-500/10 text-neutral-700 border-neutral-300"
+    return "bg-secondary"
+  }
+
+  const labelByEstado = (s: string) => {
+    const up = s.toLowerCase()
+    if (up === "finalizada_pagada") return "Pagada"
+    if (up === "finalizada") return "Finalizada"
+    if (up === "activa") return "En curso"
+    if (up === "pendiente") return "Pendiente"
+    if (up === "confirmada") return "Confirmada"
+    if (up === "cancelada") return "Cancelada"
+    if (up === "expirada") return "Expirada"
+    if (up === "no_show") return "No asistió"
+    return s
+  }
+
+  const iconByMetodo = (metodo_tipo?: string | null) => {
+    const tipo = (metodo_tipo || "").toLowerCase()
+    if (tipo.includes("efectivo") || tipo === "efectivo") return <Banknote className="h-4 w-4" />
+    if (tipo.includes("qr") || tipo === "qr") return <Smartphone className="h-4 w-4" />
+    if (tipo.includes("tarjeta") || tipo === "tarjeta") return <CreditCard className="h-4 w-4" />
+    return <Banknote className="h-4 w-4" />
+  }
+
   // ========== CALCULATE STATISTICS ==========
   useEffect(() => {
     const disponibles = spaces.filter(s => s.estado === 'disponible').length
@@ -445,8 +527,34 @@ export default function ParkingManagementPage() {
       void reloadSpaces()
       void reloadReservas()
       void reloadPagos()
+      void reloadOperaciones()
     }
-  }, [parkingId, reloadTarifas, reloadSpaces, reloadReservas, reloadPagos])
+  }, [parkingId, reloadTarifas, reloadSpaces, reloadReservas, reloadPagos, reloadOperaciones])
+
+  // Recargar operaciones cuando cambian filtros
+  useEffect(() => {
+    if (parkingId) {
+      const reload = async () => {
+        setOpsLoading(true)
+        setOpsError("")
+        try {
+          const filters: any = {}
+          if (estadoFiltro) filters.estado = estadoFiltro
+          if (fechaDesde) filters.fecha_desde = fechaDesde
+          if (fechaHasta) filters.fecha_hasta = fechaHasta
+          if (historialQuery) filters.q = historialQuery
+
+          const data = await listOperationsForParking(parkingId, filters)
+          setOps(data)
+        } catch (e: any) {
+          setOpsError(e?.message || "Error al cargar historial de operaciones")
+        } finally {
+          setOpsLoading(false)
+        }
+      }
+      void reload()
+    }
+  }, [parkingId, estadoFiltro, fechaDesde, fechaHasta, historialQuery])
 
   const breadcrumbs = [
     { label: "Inicio", href: "/" },
@@ -541,7 +649,7 @@ export default function ParkingManagementPage() {
 
               {/* TABS */}
               <Tabs defaultValue="reservas" className="space-y-4">
-                <TabsList className="grid w-full grid-cols-3 lg:w-[450px] p-1">
+                <TabsList className="grid w-full grid-cols-4 lg:w-[600px] p-1">
                   <TabsTrigger 
                     value="reservas" 
                     className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
@@ -565,6 +673,14 @@ export default function ParkingManagementPage() {
                     <ParkingCircle className="h-4 w-4" />
                     <span className="hidden sm:inline">Espacios</span>
                     <span className="sm:hidden">🅿️</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="historial" 
+                    className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-sm"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                    <span className="hidden sm:inline">Historial</span>
+                    <span className="sm:hidden">📜</span>
                   </TabsTrigger>
                 </TabsList>
 
@@ -1054,6 +1170,205 @@ export default function ParkingManagementPage() {
                       )}
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                {/* TAB: HISTORIAL UNIFICADO */}
+                <TabsContent value="historial" className="space-y-4 mt-0 min-h-[600px]">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle className="flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5" /> 
+                        Historial de Operaciones
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          className="w-48" 
+                          placeholder="Buscar (usuario, placa)" 
+                          value={historialQuery} 
+                          onChange={e => setHistorialQuery(e.target.value)} 
+                        />
+                        <Input 
+                          type="date" 
+                          value={fechaDesde} 
+                          onChange={e => setFechaDesde(e.target.value)} 
+                          className="w-auto"
+                        />
+                        <span className="text-sm text-muted-foreground">a</span>
+                        <Input 
+                          type="date" 
+                          value={fechaHasta} 
+                          onChange={e => setFechaHasta(e.target.value)} 
+                          className="w-auto"
+                        />
+                        <Select value={estadoFiltro || "all"} onValueChange={(val) => setEstadoFiltro(val === "all" ? "" : val)}>
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Todos los estados" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">Todos los estados</SelectItem>
+                            {estadosDisponibles.map(es => (
+                              <SelectItem key={es} value={es}>
+                                {labelByEstado(es)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => void reloadOperaciones()} 
+                          disabled={opsLoading}
+                          title="Refrescar"
+                        >
+                          <RefreshCcw className={"h-4 w-4" + (opsLoading ? " animate-spin" : "")} />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {opsError && <div className="text-sm text-red-600 mb-2">{opsError}</div>}
+                      {opsLoading ? (
+                        <div className="flex items-center justify-center py-12">
+                          <div className="text-center">
+                            <RefreshCcw className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">Cargando historial...</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Fecha</TableHead>
+                                <TableHead>Estado</TableHead>
+                                <TableHead>Usuario</TableHead>
+                                <TableHead>Vehículo</TableHead>
+                                <TableHead>Espacio</TableHead>
+                                <TableHead>Duración</TableHead>
+                                <TableHead>Monto</TableHead>
+                                <TableHead className="text-right">Detalle</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {ops.map(op => {
+                                const baseDate = op.fechas.pago_at || op.fechas.salida_at || op.fechas.entrada_at || op.fechas.hora_programada_inicio || op.fechas.creada_at || ""
+                                const fechaStr = baseDate ? new Date(baseDate).toLocaleString('es-PE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'
+                                const nombre = op.usuario ? [op.usuario.nombre, op.usuario.apellido].filter(Boolean).join(' ') : '—'
+                                const placa = op.vehiculo?.placa || '—'
+                                const marcaModelo = [op.vehiculo?.marca, op.vehiculo?.modelo].filter(Boolean).join(' ')
+                                const espacio = op.espacio?.numero_espacio || '—'
+                                const mins = op.duracion_minutos || 0
+                                const horas = Math.floor(mins/60)
+                                const mm = mins % 60
+                                const durStr = mins>0 ? `${horas}h ${mm}m` : '—'
+                                const monto = op.pago?.monto ?? null
+
+                                return (
+                                  <TableRow key={op.id_operacion}>
+                                    <TableCell className="text-sm">{fechaStr}</TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-1.5">
+                                        <Badge variant="secondary" className={colorByEstado(op.estado_final)}>
+                                          {labelByEstado(op.estado_final)}
+                                        </Badge>
+                                        {op.pago && (
+                                          <span title={op.pago.metodo || "Método de pago"}>
+                                            {iconByMetodo(op.pago.metodo_tipo)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="font-medium">{nombre}</TableCell>
+                                    <TableCell>
+                                      <div className="flex flex-col">
+                                        <span className="font-medium">{placa}</span>
+                                        {marcaModelo && <span className="text-xs text-muted-foreground">{marcaModelo}</span>}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell><Badge variant="secondary">{espacio}</Badge></TableCell>
+                                    <TableCell className="text-sm">{durStr}</TableCell>
+                                    <TableCell className="text-sm font-semibold">{monto != null ? `S/. ${Number(monto).toFixed(2)}` : '—'}</TableCell>
+                                    <TableCell className="text-right">
+                                      <Button variant="ghost" size="icon" onClick={() => setDetalleOperacion(op)} title="Ver detalles">
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                )
+                              })}
+                              {ops.length === 0 && (
+                                <TableRow>
+                                  <TableCell colSpan={8} className="text-center text-sm text-muted-foreground py-8">
+                                    Sin resultados
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Modal de detalle de operación */}
+                  <Dialog open={!!detalleOperacion} onOpenChange={() => setDetalleOperacion(null)}>
+                    <DialogContent className="sm:max-w-[700px]">
+                      <DialogHeader>
+                        <DialogTitle>Detalle de operación</DialogTitle>
+                        <DialogDescription>Resumen del ciclo completo y comprobante si aplica.</DialogDescription>
+                      </DialogHeader>
+                      {detalleOperacion && (
+                        <div className="grid md:grid-cols-2 gap-4 text-sm">
+                          <div className="space-y-2">
+                            <div><span className="text-muted-foreground">Estado:</span> <Badge variant="secondary" className={colorByEstado(detalleOperacion.estado_final)}>{labelByEstado(detalleOperacion.estado_final)}</Badge></div>
+                            <div><span className="text-muted-foreground">Usuario:</span> {[detalleOperacion.usuario?.nombre, detalleOperacion.usuario?.apellido].filter(Boolean).join(' ') || '—'}</div>
+                            <div><span className="text-muted-foreground">Email:</span> {detalleOperacion.usuario?.email || '—'}</div>
+                            <div><span className="text-muted-foreground">Teléfono:</span> {detalleOperacion.usuario?.telefono || '—'}</div>
+                            <div><span className="text-muted-foreground">Vehículo:</span> {detalleOperacion.vehiculo?.placa || '—'} {detalleOperacion.vehiculo?.marca || detalleOperacion.vehiculo?.modelo ? `· ${detalleOperacion.vehiculo?.marca||''} ${detalleOperacion.vehiculo?.modelo||''}` : ''}</div>
+                            <div><span className="text-muted-foreground">Espacio:</span> {detalleOperacion.espacio?.numero_espacio || '—'}</div>
+                            <div><span className="text-muted-foreground">Programado:</span> {detalleOperacion.fechas.hora_programada_inicio ? new Date(detalleOperacion.fechas.hora_programada_inicio).toLocaleString('es-PE') : '—'}{detalleOperacion.fechas.hora_programada_fin ? ` → ${new Date(detalleOperacion.fechas.hora_programada_fin).toLocaleString('es-PE')}` : ''}</div>
+                            <div><span className="text-muted-foreground">Entrada:</span> {detalleOperacion.fechas.entrada_at ? new Date(detalleOperacion.fechas.entrada_at).toLocaleString('es-PE') : '—'}</div>
+                            <div><span className="text-muted-foreground">Salida:</span> {detalleOperacion.fechas.salida_at ? new Date(detalleOperacion.fechas.salida_at).toLocaleString('es-PE') : '—'}</div>
+                            <div><span className="text-muted-foreground">Duración:</span> {(() => { const m=detalleOperacion.duracion_minutos||0; const h=Math.floor(m/60); const mm=m%60; return m>0?`${h}h ${mm}m`:'—'; })()}</div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="font-medium mb-1">Comprobante</div>
+                            <div><span className="text-muted-foreground">Monto:</span> {detalleOperacion.pago?.monto != null ? `S/. ${Number(detalleOperacion.pago.monto).toFixed(2)}` : '—'}</div>
+                            <div><span className="text-muted-foreground">Estado:</span> {detalleOperacion.pago?.estado || '—'}</div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-muted-foreground">Método:</span> 
+                              {detalleOperacion.pago?.metodo ? (
+                                <span className="flex items-center gap-1">
+                                  {iconByMetodo(detalleOperacion.pago.metodo_tipo)}
+                                  <span>{detalleOperacion.pago.metodo}</span>
+                                </span>
+                              ) : '—'}
+                            </div>
+                            <div><span className="text-muted-foreground">Emitido:</span> {detalleOperacion.pago?.comprobante?.emitido_en ? new Date(detalleOperacion.pago.comprobante.emitido_en).toLocaleString('es-PE') : '—'}</div>
+                            <div><span className="text-muted-foreground">Tipo:</span> {detalleOperacion.pago?.comprobante?.tipo || '—'}</div>
+                            <div><span className="text-muted-foreground">Serie:</span> {detalleOperacion.pago?.comprobante?.serie || '—'}</div>
+                            <div><span className="text-muted-foreground">Número:</span> {detalleOperacion.pago?.comprobante?.numero ?? '—'}</div>
+                            <div className="mt-3">
+                              <div className="font-medium mb-1 flex items-center gap-1"><Clock className="h-4 w-4" /> Línea de tiempo</div>
+                              <div className="space-y-1">
+                                {(!detalleOperacion.timeline || detalleOperacion.timeline.length === 0) && (
+                                  <div className="text-muted-foreground">Sin eventos</div>
+                                )}
+                                {(detalleOperacion.timeline || buildTimeline(detalleOperacion)).map(ev => (
+                                  <div key={ev.key+ev.at} className="flex items-center justify-between border rounded-md px-2 py-1">
+                                    <div className="text-sm">{ev.label}</div>
+                                    <div className="text-xs text-muted-foreground">{ev.at ? new Date(ev.at).toLocaleString('es-PE') : '—'}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <DialogFooter>
+                        <Button onClick={() => setDetalleOperacion(null)}>Cerrar</Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </TabsContent>
               </Tabs>
 
