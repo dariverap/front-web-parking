@@ -336,7 +336,9 @@ export default function ParkingManagementPage() {
             continue
           }
           
-          const fechaPago = new Date(fechaRaw).toISOString().split('T')[0]
+          // Usar FECHA LOCAL (no UTC) para comparar con 'hoy'
+          const d = new Date(fechaRaw)
+          const fechaPago = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
           
           const esCompletado = estadoNormalizado === 'COMPLETADO'
           const esHoy = fechaPago === hoy
