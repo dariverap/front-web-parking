@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Plus, Edit, Trash2, Users, Shield, UserCheck, Search } from "lucide-react"
+import { Plus, Edit, Trash2, Users, Shield, UserCheck, Search, Loader2 } from "lucide-react"
 import { listUsers, toggleBlockUser, deleteUser, getUserParkings, assignParkingsToUser, removeParkingFromUser, type UserRecord, updateUser, type ParkingAssignment } from "@/lib/users"
 import { lettersOnly, digitsOnly, isValidName, isValidPhone, isValidEmail } from "@/lib/validators"
 import { listAllParkings, type ParkingRecord } from "@/lib/parkings"
@@ -46,6 +46,9 @@ function UsersPageContent() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [formData, setFormData] = useState({
     name: "",
@@ -58,6 +61,8 @@ function UsersPageContent() {
   const [parkings, setParkings] = useState<ParkingRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string|undefined>(undefined)
+  const [opMessage, setOpMessage] = useState<string>("")
+  const [opType, setOpType] = useState<"success"|"error"|"">("")
 
   // Derived validations
   const validName = isValidName(formData.name)
@@ -158,6 +163,7 @@ function UsersPageContent() {
 
   const handleCreate = async () => {
     try {
+      setIsCreating(true)
       // 1) Registrar como cliente
       const nombre = formData.name.split(" ").slice(0, -1).join(" ") || formData.name
       const apellido = formData.name.split(" ").slice(-1).join(" ") || ""
@@ -202,14 +208,21 @@ function UsersPageContent() {
       setFilteredUsers(mapped)
       setIsCreateDialogOpen(false)
       setFormData({ name: "", email: "", phone: "", role: "", status: "active", assignedParkings: [] })
+      setOpMessage("Usuario creado correctamente")
+      setOpType("success")
     } catch (e) {
-      // TODO: toast de error
+      const message = (e as any)?.response?.data?.message || (e as any)?.message || "No se pudo crear el usuario"
+      setOpMessage(message)
+      setOpType("error")
+    } finally {
+      setIsCreating(false)
     }
   }
 
   const handleEdit = async () => {
     if (!selectedUser) return
     try {
+      setIsSavingEdit(true)
       const payload: Partial<UserRecord> = {
         nombre: formData.name.split(" ").slice(0, -1).join(" ") || formData.name,
         apellido: formData.name.split(" ").slice(-1).join(" ") || "",
@@ -252,14 +265,21 @@ function UsersPageContent() {
       setFilteredUsers(mapped)
       setIsEditDialogOpen(false)
       setSelectedUser(null)
+      setOpMessage("Cambios guardados correctamente")
+      setOpType("success")
     } catch (e) {
-      // TODO: mostrar toast de error
+      const message = (e as any)?.response?.data?.message || (e as any)?.message || "No se pudo guardar los cambios"
+      setOpMessage(message)
+      setOpType("error")
+    } finally {
+      setIsSavingEdit(false)
     }
   }
 
   const handleDelete = async () => {
     if (!selectedUser) return
     try {
+      setIsDeleting(true)
       await deleteUser(selectedUser.id)
       const refreshed = await listUsers()
       const mapped: UIUser[] = refreshed.map((u: any) => ({
@@ -276,8 +296,14 @@ function UsersPageContent() {
       setFilteredUsers(mapped)
       setIsDeleteDialogOpen(false)
       setSelectedUser(null)
+      setOpMessage("Usuario eliminado correctamente")
+      setOpType("success")
     } catch (e) {
-      // TODO: mostrar toast de error
+      const message = (e as any)?.response?.data?.message || (e as any)?.message || "No se pudo eliminar el usuario"
+      setOpMessage(message)
+      setOpType("error")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -359,6 +385,14 @@ function UsersPageContent() {
 
   return (
     <div className="p-6 pt-16 md:pt-6">
+          {opType && (
+            <div className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded shadow ${opType === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+              <div className="flex items-center gap-3">
+                <span className="text-sm">{opMessage}</span>
+                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-0" onClick={() => { setOpType(""); setOpMessage("") }}>Cerrar</Button>
+              </div>
+            </div>
+          )}
           <Breadcrumbs items={[{ label: "Usuarios" }]} />
 
           <div className="space-y-6">
@@ -371,7 +405,7 @@ function UsersPageContent() {
 
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-green-600 hover:bg-green-700 text-white">
+                  <Button className="bg-green-600 hover:bg-green-700 text-white cursor-pointer active:scale-[.98] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-500 transition">
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar Usuario
                   </Button>
@@ -452,10 +486,19 @@ function UsersPageContent() {
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    <Button variant="outline" className="cursor-pointer" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreate} disabled={!canCreate}>Crear Usuario</Button>
+                    <Button onClick={handleCreate} disabled={!canCreate || isCreating} className="cursor-pointer active:scale-[.98] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-500 transition">
+                      {isCreating ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Creando...
+                        </span>
+                      ) : (
+                        "Crear Usuario"
+                      )}
+                    </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
@@ -607,7 +650,7 @@ function UsersPageContent() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={user.status === "inactive" ? "text-green-600 hover:text-green-700" : "text-yellow-600 hover:text-yellow-700"}
+                                    className={`${user.status === "inactive" ? "text-green-600 hover:text-green-700" : "text-yellow-600 hover:text-yellow-700"} cursor-pointer transition-colors active:scale-95`}
                                     onClick={async () => {
                                       try {
                                         await toggleBlockUser(user.id)
@@ -633,7 +676,7 @@ function UsersPageContent() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="text-red-600 hover:text-red-700"
+                                  className="text-red-600 hover:text-red-700 cursor-pointer transition-colors active:scale-95"
                                   onClick={() => openDeleteDialog(user)}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -738,10 +781,19 @@ function UsersPageContent() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="outline" className="cursor-pointer" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEdit} disabled={!canEdit}>Guardar Cambios</Button>
+            <Button onClick={handleEdit} disabled={!canEdit || isSavingEdit} className="cursor-pointer active:scale-[.98] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary transition">
+              {isSavingEdit ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Guardando...
+                </span>
+              ) : (
+                "Guardar Cambios"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -756,11 +808,18 @@ function UsersPageContent() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+            <Button variant="outline" className="cursor-pointer" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Eliminar
+            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting} className="cursor-pointer active:scale-[.98] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 transition">
+              {isDeleting ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Eliminando...
+                </span>
+              ) : (
+                "Eliminar"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

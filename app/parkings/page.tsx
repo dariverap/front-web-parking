@@ -18,7 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Edit, Trash2, Eye, MapPin, Car, DollarSign } from "lucide-react"
+import { Plus, Edit, Trash2, Eye, MapPin, Car, DollarSign, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 // API clients
 import { listAllParkings, listParkingsByUser, getParkingById, createParking as apiCreateParking, updateParking as apiUpdateParking, assignAdminToParking as apiAssignAdminToParking, softDeleteParking as apiSoftDeleteParking, type ParkingRecord } from "@/lib/parkings"
@@ -47,6 +47,8 @@ export default function ParkingsPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [deleteReason, setDeleteReason] = useState("")
   const [deleteError, setDeleteError] = useState<string>("")
   const [isDeleting, setIsDeleting] = useState(false)
@@ -314,6 +316,7 @@ const canEdit = (validName || formData.name.trim().length > 0) &&
   }, [user?.rol, (user as any)?.id_usuario])
   const handleCreate = async () => {
     try {
+      setIsCreating(true)
       const payload = {
         nombre: formData.name.trim(),
         direccion: formData.address.trim(),
@@ -327,7 +330,9 @@ const canEdit = (validName || formData.name.trim().length > 0) &&
       // Validación básica
       if (!payload.nombre || !payload.direccion || isNaN(payload.capacidad_total) || 
           isNaN(payload.latitud) || isNaN(payload.longitud)) {
-        return // No mostramos mensaje de error
+        setOpMessage("Revisa los campos requeridos antes de crear el parking")
+        setOpType("error")
+        return
       }
 
       // Crear el parking
@@ -366,42 +371,55 @@ const canEdit = (validName || formData.name.trim().length > 0) &&
       const message = err?.response?.data?.message || err?.message || "No se pudo crear el parking"
       setOpMessage(message)
       setOpType("error")
+    } finally {
+      setIsCreating(false)
     }
   }
 
   const handleEdit = async () => {
-    // Actualizar datos básicos
-    await apiUpdateParking(selectedParking.id_parking || selectedParking.id, {
-      nombre: formData.name,
-      direccion: formData.address,
-      capacidad_total: formData.totalSpaces ? Number(formData.totalSpaces) : undefined,
-      latitud: formData.lat ? Number(formData.lat) : undefined,
-      longitud: formData.lng ? Number(formData.lng) : undefined,
-    })
-    // Asignación de admin si cambió
-    if (formData.adminId && formData.adminId !== selectedParking.id_admin) {
-      await apiAssignAdminToParking(selectedParking.id_parking || selectedParking.id, formData.adminId)
+    try {
+      setIsSavingEdit(true)
+      // Actualizar datos básicos
+      await apiUpdateParking(selectedParking.id_parking || selectedParking.id, {
+        nombre: formData.name,
+        direccion: formData.address,
+        capacidad_total: formData.totalSpaces ? Number(formData.totalSpaces) : undefined,
+        latitud: formData.lat ? Number(formData.lat) : undefined,
+        longitud: formData.lng ? Number(formData.lng) : undefined,
+      })
+      // Asignación de admin si cambió
+      if (formData.adminId && formData.adminId !== selectedParking.id_admin) {
+        await apiAssignAdminToParking(selectedParking.id_parking || selectedParking.id, formData.adminId)
+      }
+      // Refrescar lista
+      const fresh = await listAllParkings()
+      const mapped = fresh.map((p: ParkingRecord) => ({
+        id: String(p.id_parking),
+        id_parking: p.id_parking,
+        name: p.nombre,
+        address: p.direccion,
+        totalSpaces: p.capacidad_total,
+        occupiedSpaces: p.ocupados ?? 0,
+        hourlyRate: (p as any).tarifa_hora ?? (p as any).tarifa ?? undefined,
+        status: p.estado ?? "active",
+        adminName: p.admin_nombre,
+        id_admin: p.id_admin,
+        revenue: p.revenue ?? 0,
+        latitud: p.latitud,
+        longitud: p.longitud,
+      }))
+      setParkings(mapped)
+      setIsEditDialogOpen(false)
+      setSelectedParking(null)
+      setOpMessage("Cambios guardados correctamente")
+      setOpType("success")
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || "No se pudo guardar los cambios"
+      setOpMessage(message)
+      setOpType("error")
+    } finally {
+      setIsSavingEdit(false)
     }
-    // Refrescar lista
-    const fresh = await listAllParkings()
-    const mapped = fresh.map((p: ParkingRecord) => ({
-      id: String(p.id_parking),
-      id_parking: p.id_parking,
-      name: p.nombre,
-      address: p.direccion,
-      totalSpaces: p.capacidad_total,
-      occupiedSpaces: p.ocupados ?? 0,
-      hourlyRate: (p as any).tarifa_hora ?? (p as any).tarifa ?? undefined,
-      status: p.estado ?? "active",
-      adminName: p.admin_nombre,
-      id_admin: p.id_admin,
-      revenue: p.revenue ?? 0,
-      latitud: p.latitud,
-      longitud: p.longitud,
-    }))
-    setParkings(mapped)
-    setIsEditDialogOpen(false)
-    setSelectedParking(null)
   }
 
   const handleDelete = async () => {
@@ -654,11 +672,18 @@ const canEdit = (validName || formData.name.trim().length > 0) &&
                     )}
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    <Button variant="outline" className="cursor-pointer" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700" disabled={!canCreate}>
-                      Crear Parking
+                    <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700 cursor-pointer active:scale-[.98] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-green-500 transition" disabled={!canCreate || isCreating}>
+                      {isCreating ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Creando...
+                        </span>
+                      ) : (
+                        "Crear Parking"
+                      )}
                     </Button>
                   </DialogFooter>
                   </DialogContent>
@@ -928,10 +953,23 @@ const canEdit = (validName || formData.name.trim().length > 0) &&
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="outline" className="cursor-pointer" onClick={() => setIsEditDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleEdit} disabled={!canEdit}>Guardar Cambios</Button>
+            <Button
+              onClick={handleEdit}
+              disabled={!canEdit || isSavingEdit}
+              className="cursor-pointer active:scale-[.98] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary transition"
+            >
+              {isSavingEdit ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Guardando...
+                </span>
+              ) : (
+                "Guardar Cambios"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
