@@ -18,8 +18,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, Edit, Trash2, UserCheck, Search, Phone } from "lucide-react"
 import { lettersOnly, digitsOnly, isValidName, isValidPhone } from "@/lib/validators"
@@ -29,73 +27,7 @@ import { createEmployee, deleteEmployee } from "@/lib/employees"
 import { assignParkingsToUser, removeParkingFromUser, getUser } from "@/lib/users"
 import { listAllParkings, listParkingsByUser, type ParkingRecord } from "@/lib/parkings"
 import { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription } from "@/components/ui/toast"
-
-const mockEmployees = [
-  {
-    id: "1",
-    name: "Juan Pérez",
-    email: "juan.perez@email.com",
-    phone: "+34 666 901 234",
-    position: "Operador de Parking",
-    status: "active",
-    assignedParkings: ["1"],
-    parkingNames: ["Parking Centro"],
-    shift: "morning",
-    salary: "1800",
-    hireDate: "2024-01-10",
-    lastLogin: "2024-01-15 08:30",
-    notes: "Empleado responsable y puntual",
-  },
-  {
-    id: "2",
-    name: "María González",
-    email: "maria.gonzalez@email.com",
-    phone: "+34 666 567 890",
-    position: "Supervisora",
-    status: "inactive",
-    assignedParkings: ["2"],
-    parkingNames: ["Parking Norte"],
-    shift: "afternoon",
-    salary: "2200",
-    hireDate: "2024-01-05",
-    lastLogin: "2024-01-10 17:20",
-    notes: "En licencia médica temporal",
-  },
-  {
-    id: "3",
-    name: "Carlos Martín",
-    email: "carlos.martin@email.com",
-    phone: "+34 666 234 567",
-    position: "Operador de Parking",
-    status: "active",
-    assignedParkings: ["3"],
-    parkingNames: ["Parking Sur"],
-    shift: "night",
-    salary: "1900",
-    hireDate: "2023-12-15",
-    lastLogin: "2024-01-15 22:15",
-    notes: "Especialista en turno nocturno",
-  },
-  {
-    id: "4",
-    name: "Ana Rodríguez",
-    email: "ana.rodriguez@email.com",
-    phone: "+34 666 345 678",
-    position: "Cajera",
-    status: "active",
-    assignedParkings: ["1", "2"],
-    parkingNames: ["Parking Centro", "Parking Norte"],
-    shift: "morning",
-    salary: "1700",
-    hireDate: "2024-01-08",
-    lastLogin: "2024-01-15 09:45",
-    notes: "Excelente atención al cliente",
-  },
-]
-
-// Parkings se cargarán desde API
-
-// UI simplificada: solo datos que existen en BD
+import { Checkbox } from "@/components/ui/checkbox"
 
 function EmployeesPageContent() {
   const { user } = useAuth()
@@ -107,6 +39,11 @@ function EmployeesPageContent() {
   const [toastOpen, setToastOpen] = useState(false)
   const [toastTitle, setToastTitle] = useState("")
   const [toastDesc, setToastDesc] = useState("")
+  const [toastVariant, setToastVariant] = useState<"default" | "destructive" | "success" | "warning">("default")
+  // Loading states
+  const [isCreating, setIsCreating] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -126,8 +63,24 @@ function EmployeesPageContent() {
   const canCreate = validName && validEmail && validPhone
   const canEdit = validName && validEmail && validPhone
 
-  const showSuccess = (title: string, desc?: string) => { setToastTitle(title); setToastDesc(desc || ""); setToastOpen(true) }
-  const showError = (title: string, desc?: string) => { setToastTitle(title); setToastDesc(desc || ""); setToastOpen(true) }
+  const showSuccess = (title: string, desc?: string) => { 
+    setToastTitle(title); 
+    setToastDesc(desc || ""); 
+    setToastVariant("success"); 
+    setToastOpen(true) 
+  }
+  const showError = (title: string, desc?: string) => { 
+    setToastTitle(title); 
+    setToastDesc(desc || ""); 
+    setToastVariant("destructive"); 
+    setToastOpen(true) 
+  }
+  const showWarning = (title: string, desc?: string) => { 
+    setToastTitle(title); 
+    setToastDesc(desc || ""); 
+    setToastVariant("warning"); 
+    setToastOpen(true) 
+  }
 
   // Load employees from API with scope by role
   useEffect(() => {
@@ -172,56 +125,98 @@ function EmployeesPageContent() {
   }, [searchTerm, employees])
 
   const handleCreate = async () => {
-    // Nombre completo -> nombre, apellido
-    const nombreCompleto = formData.name?.trim() || ""
-    const parts = nombreCompleto.split(" ")
-    const apellido = parts.length > 1 ? parts.slice(1).join(" ") : ""
-    const nombre = parts[0] || nombreCompleto
-    const parking_ids = formData.assignedParkings.map((id) => Number(id)).filter((n) => Number.isInteger(n))
-
+    setIsCreating(true)
     try {
-      await createEmployee({ nombre, apellido, email: formData.email, telefono: formData.phone, parking_ids })
-      showSuccess("Empleado creado", formData.email)
-    } catch (e: any) {
-      showError("Error al crear empleado", e?.response?.data?.message || e?.message)
-      return
-    }
+      // Nombre completo -> nombre, apellido
+      const nombreCompleto = formData.name?.trim() || ""
+      const parts = nombreCompleto.split(" ")
+      const apellido = parts.length > 1 ? parts.slice(1).join(" ") : ""
+      const nombre = parts[0] || nombreCompleto
+      const parking_ids = formData.assignedParkings.map((id) => Number(id)).filter((n) => Number.isInteger(n))
 
-    // Refresh list
-    const apiEmployees = await listScopedEmployees()
-    const mapped = apiEmployees.map((e: any) => ({
-      id: e.id_usuario,
-      id_usuario: e.id_usuario,
-      name: `${e.nombre ?? ""} ${e.apellido ?? ""}`.trim(),
-      email: e.email,
-      phone: e.telefono ?? "",
-      assignedParkings: (e.parkings || []).map((p: any) => String(p.id_parking)),
-      parkingNames: (e.parkings || []).map((p: any) => p.nombre).filter(Boolean),
-      lastLogin: "",
-      raw: e,
-    }))
-    setEmployees(mapped)
-    setFilteredEmployees(mapped)
-    setIsCreateDialogOpen(false)
-    setFormData({ name: "", email: "", phone: "", assignedParkings: [] })
+      await createEmployee({ nombre, apellido, email: formData.email, telefono: formData.phone, parking_ids })
+      showSuccess("✅ Empleado creado exitosamente", `${formData.name} ha sido agregado al sistema`)
+      
+      // Refresh list
+      const apiEmployees = await listScopedEmployees()
+      const mapped = apiEmployees.map((e: any) => ({
+        id: e.id_usuario,
+        id_usuario: e.id_usuario,
+        name: `${e.nombre ?? ""} ${e.apellido ?? ""}`.trim(),
+        email: e.email,
+        phone: e.telefono ?? "",
+        assignedParkings: (e.parkings || []).map((p: any) => String(p.id_parking)),
+        parkingNames: (e.parkings || []).map((p: any) => p.nombre).filter(Boolean),
+        lastLogin: "",
+        raw: e,
+      }))
+      setEmployees(mapped)
+      setFilteredEmployees(mapped)
+      setIsCreateDialogOpen(false)
+      setFormData({ name: "", email: "", phone: "", assignedParkings: [] })
+    } catch (e: any) {
+      showError("❌ Error al crear empleado", e?.response?.data?.message || e?.message)
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   const handleEdit = async () => {
-    // Nombre completo -> nombre, apellido (split heurístico)
-    const nombreCompleto = formData.name?.trim() || ""
-    const parts = nombreCompleto.split(" ")
-    const apellido = parts.length > 1 ? parts.slice(1).join(" ") : ""
-    const nombre = parts[0] || nombreCompleto
-
-    const id = selectedEmployee?.raw?.id_usuario || selectedEmployee?.id_usuario || selectedEmployee?.id
-    if (!id) { showError("No se pudo determinar el ID del usuario a actualizar"); return }
-    console.debug('updateEmployee -> id', id, { nombre, apellido, telefono: formData.phone })
+    setIsUpdating(true)
     try {
+      // Nombre completo -> nombre, apellido (split heurístico)
+      const nombreCompleto = formData.name?.trim() || ""
+      const parts = nombreCompleto.split(" ")
+      const apellido = parts.length > 1 ? parts.slice(1).join(" ") : ""
+      const nombre = parts[0] || nombreCompleto
+
+      const id = selectedEmployee?.raw?.id_usuario || selectedEmployee?.id_usuario || selectedEmployee?.id
+      if (!id) { 
+        showError("❌ Error al actualizar", "No se pudo determinar el ID del usuario")
+        setIsUpdating(false)
+        return 
+      }
+      
       await updateEmployee(String(id), { nombre, apellido, telefono: formData.phone })
+
+      // Si es admin_general, aplicar cambios de asignaciones de parkings
+      if (user?.rol === "admin_general") {
+        const before: string[] = Array.isArray(selectedEmployee?.assignedParkings) ? selectedEmployee.assignedParkings : []
+        const after: string[] = Array.isArray(formData.assignedParkings) ? formData.assignedParkings : []
+        const toAdd = after.filter((p) => !before.includes(p)).map((p) => ({ id_parking: Number(p), rol_en_parking: 'empleado' as const }))
+        const toRemove = before.filter((p) => !after.includes(p)).map((p) => Number(p))
+        
+        if (toAdd.length > 0) {
+          await assignParkingsToUser(String(id), toAdd)
+        }
+        for (const pid of toRemove) {
+          await removeParkingFromUser(String(id), pid)
+        }
+      }
+
+      showSuccess("✅ Empleado actualizado", `Los datos de ${formData.name} han sido guardados`)
+
+      // Refrescar lista desde API
+      const apiEmployees = await listScopedEmployees()
+      const mapped = apiEmployees.map((e: any) => ({
+        id: e.id_usuario,
+        id_usuario: e.id_usuario,
+        name: `${e.nombre ?? ""} ${e.apellido ?? ""}`.trim(),
+        email: e.email,
+        phone: e.telefono ?? "",
+        assignedParkings: (e.parkings || []).map((p: any) => String(p.id_parking)),
+        parkingNames: (e.parkings || []).map((p: any) => p.nombre).filter(Boolean),
+        lastLogin: "",
+        raw: e,
+      }))
+      setEmployees(mapped)
+      setFilteredEmployees(mapped)
+      setIsEditDialogOpen(false)
+      setSelectedEmployee(null)
     } catch (e: any) {
       const status = e?.response?.status
       if (status === 404) {
-        showError("Usuario no encontrado", "Puede haber sido eliminado o el ID es inválido")
+        showError("❌ Usuario no encontrado", "El usuario puede haber sido eliminado o no existe")
         // Auto-refrescar lista y cerrar modal si el usuario no existe
         try {
           const apiEmployees = await listScopedEmployees()
@@ -242,99 +237,70 @@ function EmployeesPageContent() {
         setIsEditDialogOpen(false)
         setSelectedEmployee(null)
       } else if (status === 403) {
-        showError("Sin permisos", e?.response?.data?.message || "No tienes permisos para editar este usuario")
+        showWarning("⚠️ Sin permisos", e?.response?.data?.message || "No tienes permisos para editar este usuario")
       } else {
-        showError("Error al actualizar empleado", e?.response?.data?.message || e?.message)
+        showError("❌ Error al actualizar", e?.response?.data?.message || e?.message)
       }
-      return
+    } finally {
+      setIsUpdating(false)
     }
-
-    // Si es admin_general, aplicar cambios de asignaciones de parkings
-    if (user?.rol === "admin_general") {
-      const before: string[] = Array.isArray(selectedEmployee?.assignedParkings) ? selectedEmployee.assignedParkings : []
-      const after: string[] = Array.isArray(formData.assignedParkings) ? formData.assignedParkings : []
-      const toAdd = after.filter((p) => !before.includes(p)).map((p) => ({ id_parking: Number(p), rol_en_parking: 'empleado' as const }))
-      const toRemove = before.filter((p) => !after.includes(p)).map((p) => Number(p))
-      try {
-        if (toAdd.length > 0) {
-          await assignParkingsToUser(String(id), toAdd)
-        }
-        for (const pid of toRemove) {
-          await removeParkingFromUser(String(id), pid)
-        }
-      } catch (e: any) {
-        showError("Error al asignar parkings", e?.response?.data?.message || e?.message)
-      }
-    }
-
-    // Refrescar lista desde API
-    const apiEmployees = await listScopedEmployees()
-    const mapped = apiEmployees.map((e: any) => ({
-      id: e.id_usuario,
-      id_usuario: e.id_usuario,
-      name: `${e.nombre ?? ""} ${e.apellido ?? ""}`.trim(),
-      email: e.email,
-      phone: e.telefono ?? "",
-      assignedParkings: (e.parkings || []).map((p: any) => String(p.id_parking)),
-      parkingNames: (e.parkings || []).map((p: any) => p.nombre).filter(Boolean),
-      lastLogin: "",
-      raw: e,
-    }))
-    setEmployees(mapped)
-    setFilteredEmployees(mapped)
-    setIsEditDialogOpen(false)
-    setSelectedEmployee(null)
-    showSuccess("Empleado actualizado", undefined)
   }
 
   const handleDelete = async () => {
-    const id = selectedEmployee?.raw?.id_usuario || selectedEmployee?.id_usuario || selectedEmployee?.id
-    if (!id) { showError("No se pudo determinar el ID del usuario a eliminar"); return }
-    console.debug('deleteEmployee -> id', id)
+    setIsDeleting(true)
     try {
+      const id = selectedEmployee?.raw?.id_usuario || selectedEmployee?.id_usuario || selectedEmployee?.id
+      if (!id) { 
+        showError("❌ Error al eliminar", "No se pudo determinar el ID del usuario")
+        setIsDeleting(false)
+        return 
+      }
+      
       await deleteEmployee(String(id))
+      showSuccess("✅ Empleado eliminado", `${selectedEmployee?.name || 'El usuario'} ha sido dado de baja del sistema`)
+      
+      const apiEmployees = await listScopedEmployees()
+      const mapped = apiEmployees.map((e: any) => ({
+        id: e.id_usuario,
+        id_usuario: e.id_usuario,
+        name: `${e.nombre ?? ""} ${e.apellido ?? ""}`.trim(),
+        email: e.email,
+        phone: e.telefono ?? "",
+        assignedParkings: (e.parkings || []).map((p: any) => String(p.id_parking)),
+        parkingNames: (e.parkings || []).map((p: any) => p.nombre).filter(Boolean),
+        lastLogin: "",
+        raw: e,
+      }))
+      setEmployees(mapped)
+      setFilteredEmployees(mapped)
+      setIsDeleteDialogOpen(false)
+      setSelectedEmployee(null)
     } catch (e: any) {
       const status = e?.response?.status
       if (status === 404) {
-        showError("Usuario no encontrado", "Puede haber sido eliminado previamente")
+        showError("❌ Usuario no encontrado", "El usuario puede haber sido eliminado previamente")
       } else if (status === 403) {
-        showError("Sin permisos", e?.response?.data?.message || "No tienes permisos para eliminar este usuario")
+        showWarning("⚠️ Sin permisos", e?.response?.data?.message || "No tienes permisos para eliminar este usuario")
       } else {
-        showError("Error al eliminar empleado", e?.response?.data?.message || e?.message)
+        showError("❌ Error al eliminar", e?.response?.data?.message || e?.message)
       }
-      return
+    } finally {
+      setIsDeleting(false)
     }
-    const apiEmployees = await listScopedEmployees()
-    const mapped = apiEmployees.map((e: any) => ({
-      id: e.id_usuario,
-      id_usuario: e.id_usuario,
-      name: `${e.nombre ?? ""} ${e.apellido ?? ""}`.trim(),
-      email: e.email,
-      phone: e.telefono ?? "",
-      assignedParkings: (e.parkings || []).map((p: any) => String(p.id_parking)),
-      parkingNames: (e.parkings || []).map((p: any) => p.nombre).filter(Boolean),
-      lastLogin: "",
-      raw: e,
-    }))
-    setEmployees(mapped)
-    setFilteredEmployees(mapped)
-    setIsDeleteDialogOpen(false)
-    setSelectedEmployee(null)
-    showSuccess("Empleado eliminado", undefined)
   }
 
   const openEditDialog = async (employee: any) => {
     // Verificar existencia actual del usuario antes de abrir el modal
     const uid = employee?.raw?.id_usuario || employee?.id_usuario || employee?.id
     if (!uid) {
-      showError("No se pudo determinar el ID del usuario a editar")
+      showError("❌ Error", "No se pudo determinar el ID del usuario")
       return
     }
     try {
       await getUser(String(uid))
     } catch (e: any) {
       if (e?.response?.status === 404) {
-        showError("Usuario no encontrado", "Puede haber sido eliminado")
+        showError("❌ Usuario no encontrado", "El usuario puede haber sido eliminado")
         // Refrescar lista
         try {
           const apiEmployees = await listScopedEmployees()
@@ -399,7 +365,7 @@ function EmployeesPageContent() {
               {user?.rol === "admin_general" && (
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-green-600 hover:bg-green-700 text-white">
+                  <Button className="bg-green-600 hover:bg-green-700 text-white cursor-pointer transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-green-500 shadow-sm hover:shadow">
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar Empleado
                   </Button>
@@ -471,10 +437,10 @@ function EmployeesPageContent() {
                   </div>
                   </div>
                   <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)} className="cursor-pointer hover:bg-muted/40 transition-colors">
                       Cancelar
                     </Button>
-                    <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700" disabled={!canCreate}>
+                    <Button onClick={handleCreate} className="bg-green-600 hover:bg-green-700 cursor-pointer transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-green-500 shadow-sm hover:shadow disabled:opacity-50" disabled={!canCreate}>
                       Crear Empleado
                     </Button>
                   </DialogFooter>
@@ -573,7 +539,7 @@ function EmployeesPageContent() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-blue-600 hover:text-blue-700"
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer transition-colors active:scale-95"
                                 onClick={() => openEditDialog(employee)}
                               >
                                 <Edit className="h-4 w-4" />
@@ -582,7 +548,7 @@ function EmployeesPageContent() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="text-red-600 hover:text-red-700"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer transition-colors active:scale-95"
                                   onClick={() => openDeleteDialog(employee)}
                                 >
                                   <Trash2 className="h-4 w-4" />
@@ -667,10 +633,10 @@ function EmployeesPageContent() {
             {/* Notas eliminadas (no existe en BD) */}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="cursor-pointer hover:bg-muted/40 transition-colors">
               Cancelar
             </Button>
-            <Button onClick={handleEdit} disabled={!canEdit}>Guardar Cambios</Button>
+            <Button onClick={handleEdit} disabled={!canEdit} className="cursor-pointer transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-ring shadow-sm hover:shadow disabled:opacity-50">Guardar Cambios</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -685,10 +651,10 @@ function EmployeesPageContent() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)} className="cursor-pointer hover:bg-muted/40 transition-colors">
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
+            <Button variant="destructive" onClick={handleDelete} className="cursor-pointer transition-transform active:scale-95 focus-visible:ring-2 focus-visible:ring-destructive shadow-sm hover:shadow">
               Eliminar
             </Button>
           </DialogFooter>
