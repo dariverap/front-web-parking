@@ -9,6 +9,7 @@ export type TarifaRecord = {
 }
 
 export async function listTarifasByParking(parkingId: number | string): Promise<TarifaRecord[]> {
+  console.log('[tarifas.ts] listTarifasByParking called with parkingId:', parkingId, 'type:', typeof parkingId)
   const res = await api.get(`/parking/${parkingId}/tarifas`)
   const data = res.data?.data ?? res.data
   return Array.isArray(data) ? data : []
@@ -21,11 +22,13 @@ export async function createTarifa(parkingId: number | string, payload: { tipo: 
 }
 
 export async function updateTarifa(parkingId: number | string, tarifaId: number | string, payload: Partial<{ tipo: string; monto: number; condiciones?: string }>) {
+  console.log('[tarifas.ts] updateTarifa called with parkingId:', parkingId, 'tarifaId:', tarifaId)
   const res = await api.put(`/parking/${parkingId}/tarifas/${tarifaId}`, payload)
   return res.data?.data ?? res.data
 }
 
 export async function deleteTarifa(parkingId: number | string, tarifaId: number | string) {
+  console.log('[tarifas.ts] deleteTarifa called with parkingId:', parkingId, 'tarifaId:', tarifaId)
   const res = await api.delete(`/parking/${parkingId}/tarifas/${tarifaId}`)
   return res.data?.data ?? res.data
 }

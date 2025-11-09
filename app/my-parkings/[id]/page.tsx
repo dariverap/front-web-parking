@@ -25,6 +25,8 @@ import PaymentModal from "@/components/PaymentModal"
 export default function ParkingManagementPage() {
   const params = useParams()
   const parkingId = params?.id as string | undefined
+  
+  console.log('[ParkingManagementPage] Component loaded with parkingId:', parkingId, 'params:', params)
 
   // ========== TARIFAS STATE ==========
   const [tarifas, setTarifas] = useState<TarifaRecord[]>([])
@@ -156,7 +158,7 @@ export default function ParkingManagementPage() {
     setIsSubmittingTarifa(true)
     try {
       if (editingTarifa) {
-        await updateTarifa(editingTarifa.id_tarifa, {
+        await updateTarifa(parkingId, editingTarifa.id_tarifa, {
           tipo: tipo.trim(),
           monto: parseFloat(monto),
           condiciones: condiciones.trim() || null
@@ -181,7 +183,7 @@ export default function ParkingManagementPage() {
     if (!window.confirm("¿Eliminar esta tarifa?")) return
     setTarifaError("")
     try {
-      await deleteTarifa(t.id_tarifa)
+      await deleteTarifa(parkingId, t.id_tarifa)
       await reloadTarifas()
     } catch (err: any) {
       setTarifaError(err?.message || "Error al eliminar")
