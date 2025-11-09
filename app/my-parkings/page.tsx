@@ -55,7 +55,8 @@ export default function MyParkingsPage() {
   useEffect(() => {
     const role = user?.rol || ""
     const uid = (user as any)?.id_usuario || ""
-    const adminId = (user as any)?.id || uid || ""
+    // Asegurar uso del id_usuario (numérico) para usuario_parking y dejar id (uuid) solo para legacy id_admin si aplica
+    const adminId = (user as any)?.id_admin ? (user as any).id_admin : (user as any)?.id || ""
     const key = `${role}::${uid}`
     if (role !== "admin_parking" || (!uid && !adminId)) return
     if (lastFetchKeyRef.current === key) return
@@ -67,11 +68,24 @@ export default function MyParkingsPage() {
         // Intentar por admin asignado primero; fallback a asignaciones por usuario
         const [byAdmin, byUser] = await Promise.all([
           adminId ? listParkingsByAdmin(adminId) : Promise.resolve([]),
-          uid ? listParkingsByUser(uid) : Promise.resolve([]),
+          uid ? listParkingsByUser(String(uid)) : Promise.resolve([]),
         ])
+        // Logs de diagnóstico en cliente
+        try {
+          const aIds = (Array.isArray(byAdmin) ? byAdmin : []).map((p: any) => p?.id_parking).filter(Boolean)
+          const uIds = (Array.isArray(byUser) ? byUser : []).map((p: any) => p?.id_parking).filter(Boolean)
+          console.log('[my-parkings] byAdmin count/ids =', aIds.length, aIds)
+          console.log('[my-parkings] byUser  count/ids =', uIds.length, uIds)
+        } catch {}
         const combined: ParkingRecord[] = [...(Array.isArray(byAdmin) ? byAdmin : []), ...(Array.isArray(byUser) ? byUser : [])]
         // Unificar por id_parking para evitar duplicados
         const unique = Object.values(Object.fromEntries(combined.map((p: any) => [p.id_parking, p]))) as ParkingRecord[]
+        try {
+          const cIds = combined.map((p: any) => p?.id_parking).filter(Boolean)
+          const uIds2 = (unique as any[]).map((p: any) => p?.id_parking).filter(Boolean)
+          console.log('[my-parkings] combined count/ids =', cIds.length, cIds)
+          console.log('[my-parkings] unique   count/ids =', uIds2.length, uIds2)
+        } catch {}
         const mapped = (unique as any[]).map((p: ParkingRecord) => ({
           id: String(p.id_parking),
           id_parking: p.id_parking,
@@ -174,10 +188,22 @@ export default function MyParkingsPage() {
       const adminId = (user as any)?.id || uid || ""
       const [byAdmin, byUser] = await Promise.all([
         adminId ? listParkingsByAdmin(adminId) : Promise.resolve([]),
-        uid ? listParkingsByUser(uid) : Promise.resolve([]),
+        uid ? listParkingsByUser(String(uid)) : Promise.resolve([]),
       ])
       const combined: ParkingRecord[] = [...(Array.isArray(byAdmin) ? byAdmin : []), ...(Array.isArray(byUser) ? byUser : [])]
+      try {
+        const aIds = (Array.isArray(byAdmin) ? byAdmin : []).map((p: any) => p?.id_parking).filter(Boolean)
+        const uIds = (Array.isArray(byUser) ? byUser : []).map((p: any) => p?.id_parking).filter(Boolean)
+        const cIds = combined.map((p: any) => p?.id_parking).filter(Boolean)
+        console.log('[my-parkings][refresh] byAdmin ids =', aIds)
+        console.log('[my-parkings][refresh] byUser  ids =', uIds)
+        console.log('[my-parkings][refresh] combined ids =', cIds)
+      } catch {}
       const unique = Object.values(Object.fromEntries((combined as any[]).map((p: any) => [p.id_parking, p]))) as any[]
+      try {
+        const uIds2 = unique.map((p: any) => p?.id_parking).filter(Boolean)
+        console.log('[my-parkings][refresh] unique ids =', uIds2)
+      } catch {}
       const mapped = unique.map((p: any) => ({
         id: String(p.id_parking),
         id_parking: p.id_parking,
