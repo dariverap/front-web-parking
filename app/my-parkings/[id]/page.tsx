@@ -40,6 +40,21 @@ export default function ParkingManagementPage() {
   })
   const [tarifaError, setTarifaError] = useState("")
   const [isSubmittingTarifa, setIsSubmittingTarifa] = useState(false)
+  
+  // Catálogo de tipos permitidos (canónicos en minúsculas)
+  const allowedTarifaTypes = useMemo(() => (
+    ['hora','medio dia','dia','semana','mes'] as const
+  ), [])
+
+  const displayTipo = useCallback((tipo: string) => {
+    const t = (tipo || '').toLowerCase()
+    if (t === 'hora') return 'Hora'
+    if (t === 'medio dia') return 'Medio día'
+    if (t === 'dia') return 'Día'
+    if (t === 'semana') return 'Semana'
+    if (t === 'mes') return 'Mes'
+    return tipo || '—'
+  }, [])
 
   // ========== ESPACIOS STATE ==========
   const [spaces, setSpaces] = useState<SpaceRecord[]>([])
@@ -146,12 +161,23 @@ export default function ParkingManagementPage() {
   const submitTarifa = async () => {
     if (!parkingId) return
     const { tipo, monto, condiciones } = tarifaForm
-    if (!tipo.trim()) {
+    const tipoCanon = tipo.trim().toLowerCase()
+    if (!tipoCanon) {
       setTarifaError("El tipo es requerido")
+      return
+    }
+    if (!allowedTarifaTypes.includes(tipoCanon as any)) {
+      setTarifaError("Tipo inválido. Usa: Hora, Medio día, Día, Semana o Mes")
       return
     }
     if (!monto.trim()) {
       setTarifaError("El monto es requerido")
+      return
+    }
+    // Validar duplicados en cliente (ayuda rápida de UX; el backend también valida)
+    const existsSameType = tarifas.some(t => (t.tipo || '').toLowerCase() === tipoCanon && (!editingTarifa || t.id_tarifa !== editingTarifa.id_tarifa))
+    if (existsSameType) {
+      setTarifaError("Ya existe una tarifa de ese tipo para este parking")
       return
     }
     setTarifaError("")
@@ -159,13 +185,13 @@ export default function ParkingManagementPage() {
     try {
       if (editingTarifa) {
         await updateTarifa(parkingId, editingTarifa.id_tarifa, {
-          tipo: tipo.trim(),
+          tipo: tipoCanon,
           monto: parseFloat(monto),
           condiciones: condiciones.trim() || null
         })
       } else {
         await createTarifa(parkingId, {
-          tipo: tipo.trim(),
+          tipo: tipoCanon,
           monto: parseFloat(monto),
           condiciones: condiciones.trim() || null
         })
@@ -988,7 +1014,7 @@ export default function ParkingManagementPage() {
                             <TableBody>
                               {tarifas.map(t => (
                                 <TableRow key={t.id_tarifa}>
-                                  <TableCell className="font-medium">{t.tipo}</TableCell>
+                                  <TableCell className="font-medium">{displayTipo(t.tipo)}</TableCell>
                                   <TableCell>S/. {Number(t.monto).toFixed(2)}</TableCell>
                                   <TableCell className="max-w-md truncate">{t.condiciones || "—"}</TableCell>
                                   <TableCell className="text-right">
@@ -1385,12 +1411,21 @@ export default function ParkingManagementPage() {
                     <div className="grid grid-cols-4 items-center gap-4">
                       <label className="text-right text-sm" htmlFor="tipo">Tipo</label>
                       <div className="col-span-3">
-                        <Input 
-                          id="tipo" 
-                          value={tarifaForm.tipo} 
-                          onChange={e => setTarifaForm(v => ({ ...v, tipo: e.target.value }))} 
-                          placeholder="hora | dia | mes" 
-                        />
+                        <Select 
+                          value={(tarifaForm.tipo || '').toLowerCase()}
+                          onValueChange={(val) => setTarifaForm(v => ({ ...v, tipo: val }))}
+                        >
+                          <SelectTrigger id="tipo" className="w-full">
+                            <SelectValue placeholder="Selecciona un tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="hora">Hora</SelectItem>
+                            <SelectItem value="medio dia">Medio día</SelectItem>
+                            <SelectItem value="dia">Día</SelectItem>
+                            <SelectItem value="semana">Semana</SelectItem>
+                            <SelectItem value="mes">Mes</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
