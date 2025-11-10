@@ -833,8 +833,9 @@ export default function ParkingManagementPage() {
                                 minute: '2-digit'
                               })
                               const estaBusy = registrandoSalida === o.id_ocupacion
-                              // Si ya hay salida solicitada (pago pendiente debe existir), no mostrar 'Marcar salida'
-                              const salidaSolicitada = !!o.hora_salida_solicitada || (!!o.monto_calculado && (o.tiempo_total || 0) > 0)
+                              // Mostrar el botón siempre que NO exista una salida solicitada explícita
+                              // Nota: monto_calculado/tiempo_total existen para ocupaciones activas y no deben ocultar el botón
+                              const salidaSolicitada = !!o.hora_salida_solicitada
 
                               return (
                                 <TableRow key={o.id_ocupacion}>

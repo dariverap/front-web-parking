@@ -59,6 +59,7 @@ export default function PaymentModal({
   const [loadingMonto, setLoadingMonto] = useState(true)
   const [montoCalculado, setMontoCalculado] = useState<number>(0)
   const [tiempoCalculado, setTiempoCalculado] = useState<number>(0)
+  const [tarifaTipo, setTarifaTipo] = useState<string | undefined>(undefined)
 
   // Calcular monto desde el backend
   useEffect(() => {
@@ -73,9 +74,11 @@ export default function PaymentModal({
           if (response.data.success) {
             const monto = response.data.data.monto || 0
             const tiempo = response.data.data.tiempo_minutos || 0
+            const tipo = response.data.data.tarifa_tipo as string | undefined
             console.log('[PaymentModal] Monto calculado:', monto, 'Tiempo:', tiempo)
             setMontoCalculado(monto)
             setTiempoCalculado(tiempo)
+            setTarifaTipo(tipo)
           }
         } catch (error: any) {
           console.error('[PaymentModal] Error al calcular monto:', error)
@@ -89,6 +92,7 @@ export default function PaymentModal({
           console.log('[PaymentModal] Fallback - Minutos:', minutos, 'Horas:', horas, 'Monto:', monto)
           setTiempoCalculado(minutos)
           setMontoCalculado(monto)
+          setTarifaTipo(undefined)
         } finally {
           setLoadingMonto(false)
         }
@@ -246,6 +250,11 @@ export default function PaymentModal({
                 ) : (
                   <p className="text-lg font-bold text-primary">
                     S/ {montoTotal.toFixed(2)}
+                  </p>
+                )}
+                {!loadingMonto && tarifaTipo && (
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Tarifa aplicada: <span className="font-medium">{tarifaTipo.charAt(0).toUpperCase() + tarifaTipo.slice(1)}</span>
                   </p>
                 )}
               </div>
