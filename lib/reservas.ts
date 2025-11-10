@@ -10,6 +10,11 @@ export interface ReservaRecord {
   hora_fin: string;
   fecha_reserva: string;
   estado: 'activa' | 'pendiente' | 'confirmada' | 'cancelada' | 'completada';
+  // Campos para reservas manuales (invitado)
+  guest_nombre?: string | null;
+  guest_documento?: string | null;
+  guest_telefono?: string | null;
+  tipo_origen?: string | null;
   usuario?: {
     id_usuario: string;
     nombre: string;

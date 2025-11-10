@@ -4,7 +4,7 @@ export type SpaceRecord = {
   id_espacio: number
   id_parking: number
   numero_espacio: string
-  estado: string // 'disponible' | 'ocupado' | 'inhabilitado' | ...
+  estado: string // 'disponible' | 'ocupado' | 'reservado' | 'deshabilitado' | 'inhabilitado' (legacy)
 }
 
 export async function listSpacesByParking(parkingId: number | string): Promise<SpaceRecord[]> {

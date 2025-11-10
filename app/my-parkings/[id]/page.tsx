@@ -21,6 +21,7 @@ import { listReservasByParking, listOcupacionesActivas, listHistorialOcupaciones
 import { listPagosPendientesByParking, listAllPagos, validarPago, type PagoPendiente, type PagoRecord } from "@/lib/pagos"
 import { listOperationsForParking, buildTimeline, type OperationRecord } from "@/lib/operations"
 import PaymentModal from "@/components/PaymentModal"
+import ManualReserveModal from "@/components/ManualReserveModal"
 
 export default function ParkingManagementPage() {
   const params = useParams()
@@ -107,6 +108,9 @@ export default function ParkingManagementPage() {
   // ========== PAYMENT MODAL STATE ==========
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
   const [selectedOcupacion, setSelectedOcupacion] = useState<OcupacionRecord | null>(null)
+
+  // ========== MANUAL RESERVE MODAL STATE ==========
+  const [isManualReserveModalOpen, setIsManualReserveModalOpen] = useState(false)
 
   // ========== STATISTICS ==========
   const [stats, setStats] = useState({
@@ -242,7 +246,7 @@ export default function ParkingManagementPage() {
   const handleToggleEnabled = async (s: SpaceRecord) => {
     if (!parkingId) return
     if (s.estado === 'ocupado' || s.estado === 'reservado') return
-    const nextEstado = s.estado === 'inhabilitado' ? 'disponible' : 'inhabilitado'
+    const nextEstado = (s.estado === 'deshabilitado' || s.estado === 'inhabilitado') ? 'disponible' : 'deshabilitado'
     setTogglingId(s.id_espacio)
     setSpaceError("")
     const oldSpaces = [...spaces]
@@ -717,9 +721,20 @@ export default function ParkingManagementPage() {
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Reservas Activas</CardTitle>
-                      <Button variant="ghost" size="icon" onClick={() => void reloadReservas()} disabled={rLoading}>
-                        <RefreshCcw className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setIsManualReserveModalOpen(true)}
+                          className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white border-none"
+                        >
+                          <Plus className="h-4 w-4 mr-1.5" />
+                          Reserva Manual
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => void reloadReservas()} disabled={rLoading}>
+                          <RefreshCcw className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       {rLoading ? (
@@ -739,7 +754,9 @@ export default function ParkingManagementPage() {
                             </TableHeader>
                             <TableBody>
                               {reservas.map(r => {
-                                const nombreUsuario = r.usuario ? `${r.usuario.nombre} ${r.usuario.apellido}` : "N/A"
+                                const nombreUsuario = r.usuario 
+                                  ? `${r.usuario.nombre} ${r.usuario.apellido}` 
+                                  : (r.guest_nombre || "N/A")
                                 const placaVehiculo = r.vehiculo?.placa || "N/A"
                                 const numeroEspacio = r.espacio?.numero_espacio || "N/A"
                                 const horaReserva = new Date(r.hora_inicio).toLocaleString('es-PE', {
@@ -753,7 +770,14 @@ export default function ParkingManagementPage() {
 
                                 return (
                                   <TableRow key={r.id_reserva}>
-                                    <TableCell className="font-medium">{nombreUsuario}</TableCell>
+                                    <TableCell className="font-medium">
+                                      <div className="flex items-center gap-2">
+                                        <span>{nombreUsuario}</span>
+                                        {!r.usuario && r.guest_nombre && (
+                                          <Badge variant="outline" className="text-xs">Invitado</Badge>
+                                        )}
+                                      </div>
+                                    </TableCell>
                                     <TableCell>
                                       <div className="flex flex-col">
                                         <span className="font-medium">{placaVehiculo}</span>
@@ -1085,7 +1109,7 @@ export default function ParkingManagementPage() {
                                 const isDisponible = s.estado === 'disponible'
                                 const isOcupado = s.estado === 'ocupado'
                                 const isReservado = s.estado === 'reservado'
-                                const isInhabilitado = s.estado === 'inhabilitado'
+                                const isInhabilitado = (s.estado === 'deshabilitado' || s.estado === 'inhabilitado')
                                 
                                 return (
                                   <Card 
@@ -1484,6 +1508,18 @@ export default function ParkingManagementPage() {
                   onSuccess={handlePaymentSuccess}
                 />
               )}
+
+              {/* Manual Reserve Modal */}
+              <ManualReserveModal
+                isOpen={isManualReserveModalOpen}
+                onClose={() => setIsManualReserveModalOpen(false)}
+                onSuccess={() => {
+                  void reloadReservas()
+                  void reloadSpaces()
+                }}
+                parkingId={parkingId!}
+                espaciosDisponibles={spaces.filter(s => s.estado === 'disponible')}
+              />
             </>
           ) : null}
         </div>
