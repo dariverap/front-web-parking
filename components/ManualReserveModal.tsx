@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { X, UserPlus, Loader2 } from "lucide-react"
 import api from "@/lib/api"
+import SuccessAnimation from "@/components/SuccessAnimation"
 
 interface Espacio {
   id_espacio: number | string
@@ -39,6 +40,8 @@ export default function ManualReserveModal({
 }: ManualReserveModalProps) {
   const [loading, setLoading] = useState(false)
   const [tarifas, setTarifas] = useState<Tarifa[]>([])
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
   const [formData, setFormData] = useState({
     guest_nombre: "",
     guest_documento: "",
@@ -106,14 +109,15 @@ export default function ManualReserveModal({
       console.log('[ManualReserveModal] Response:', response?.data)
       
       if (response.data?.success) {
-        alert(
-          formData.marcar_entrada 
-            ? `Reserva creada y entrada registrada para ${formData.guest_nombre}`
-            : `Reserva manual creada para ${formData.guest_nombre}`
-        )
+        const message = formData.marcar_entrada 
+          ? `Reserva creada y entrada registrada para ${formData.guest_nombre}`
+          : `Reserva manual creada para ${formData.guest_nombre}`
+        
+        setSuccessMessage(message)
+        setShowSuccess(true)
         resetForm()
         onSuccess()
-        onClose()
+        // onClose() se llamará cuando cierre el SuccessAnimation
       } else {
         alert('La reserva no se completó correctamente')
       }
@@ -146,8 +150,10 @@ export default function ManualReserveModal({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+    <>
+      {!showSuccess && (
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -300,6 +306,21 @@ export default function ManualReserveModal({
           </div>
         </form>
       </DialogContent>
-    </Dialog>
+      </Dialog>
+      )}
+      {/* Success Animation fuera del Dialog para evitar z-index issues */}
+      <SuccessAnimation
+        isOpen={showSuccess}
+        onClose={() => {
+          setShowSuccess(false)
+          onClose()
+        }}
+        title="¡Reserva Creada!"
+        message={successMessage}
+        useAnimation={true}
+        animationSrc="/animations/car.gif"
+        duration={0} // Desactiva auto-cierre para que solo se cierre con el botón "Entendido"
+      />
+    </>
   )
 }

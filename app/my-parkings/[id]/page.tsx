@@ -22,6 +22,8 @@ import { listPagosPendientesByParking, listAllPagos, validarPago, type PagoPendi
 import { listOperationsForParking, buildTimeline, type OperationRecord } from "@/lib/operations"
 import PaymentModal from "@/components/PaymentModal"
 import ManualReserveModal from "@/components/ManualReserveModal"
+import EmptyState from "@/components/EmptyState"
+import LoadingSpinner from "@/components/LoadingSpinner"
 
 export default function ParkingManagementPage() {
   const params = useParams()
@@ -738,7 +740,7 @@ export default function ParkingManagementPage() {
                     </CardHeader>
                     <CardContent>
                       {rLoading ? (
-                        <p className="text-sm text-muted-foreground">Cargando...</p>
+                        <LoadingSpinner message="Cargando reservas..." size="md" />
                       ) : (
                         <div className="overflow-x-auto">
                           <Table>
@@ -817,8 +819,22 @@ export default function ParkingManagementPage() {
                               })}
                               {reservas.length === 0 && (
                                 <TableRow>
-                                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
-                                    No hay reservas activas
+                                  <TableCell colSpan={6} className="p-0">
+                                    <EmptyState
+                                      title="No hay reservas activas"
+                                      description="Las nuevas reservas aparecerán aquí para confirmar entrada"
+                                      useAnimation={true}
+                                        animationSrc="/animations/empty-reservations.gif"
+                                      action={
+                                        <Button 
+                                          variant="outline"
+                                          onClick={() => setIsManualReserveModalOpen(true)}
+                                        >
+                                          <Plus className="h-4 w-4 mr-2" />
+                                          Crear Reserva Manual
+                                        </Button>
+                                      }
+                                    />
                                   </TableCell>
                                 </TableRow>
                               )}
@@ -898,8 +914,13 @@ export default function ParkingManagementPage() {
                             })}
                             {ocupaciones.length === 0 && (
                               <TableRow>
-                                <TableCell colSpan={5} className="text-center text-sm text-muted-foreground py-8">
-                                  No hay vehículos dentro
+                                <TableCell colSpan={5} className="p-0">
+                                  <EmptyState
+                                    title="No hay vehículos dentro"
+                                    description="Los vehículos que ingresen aparecerán aquí"
+                                    useAnimation={true}
+                          animationSrc="/animations/empty-parking.gif"
+                                  />
                                 </TableCell>
                               </TableRow>
                             )}
