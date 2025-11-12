@@ -386,6 +386,8 @@ const canEdit = (validName || formData.name.trim().length > 0) &&
         capacidad_total: formData.totalSpaces ? Number(formData.totalSpaces) : undefined,
         latitud: formData.lat ? Number(formData.lat) : undefined,
         longitud: formData.lng ? Number(formData.lng) : undefined,
+        // Enviar tarifa hora para que el backend la actualice (acepta tarifa|tarifa_hora)
+        tarifa: formData.hourlyRate !== "" ? Number(formData.hourlyRate) : undefined,
       })
       // Asignación de admin si cambió
       if (formData.adminId && formData.adminId !== selectedParking.id_admin) {

@@ -10,10 +10,15 @@ export interface ReservaRecord {
   hora_fin: string;
   fecha_reserva: string;
   estado: 'activa' | 'pendiente' | 'confirmada' | 'cancelada' | 'completada';
-  // Campos para reservas manuales (invitado)
+  // Campos para reservas manuales (invitado - persona)
   guest_nombre?: string | null;
   guest_documento?: string | null;
   guest_telefono?: string | null;
+  // Campos para reservas manuales (invitado - vehículo)
+  guest_vehiculo_placa?: string | null;
+  guest_vehiculo_marca?: string | null;
+  guest_vehiculo_modelo?: string | null;
+  guest_vehiculo_color?: string | null;
   tipo_origen?: string | null;
   usuario?: {
     id_usuario: string;
@@ -40,7 +45,7 @@ export interface ReservaRecord {
 export interface OcupacionRecord {
   id_ocupacion: string;
   id_reserva?: string;
-  id_usuario: string;
+  id_usuario?: string | null;
   id_espacio: string;
   id_vehiculo?: string;
   hora_entrada: string;
@@ -51,10 +56,20 @@ export interface OcupacionRecord {
   costo_total?: number;
   nombre_usuario?: string;
   numero_espacio?: string;
+  // Campos de invitado (persona)
+  guest_nombre?: string;
+  guest_documento?: string;
+  guest_telefono?: string;
+  // Campos de vehículo (registrado o invitado)
   placa?: string;
   marca?: string;
   modelo?: string;
   color?: string;
+  // Campos de vehículo invitado explícitos
+  guest_vehiculo_placa?: string;
+  guest_vehiculo_marca?: string;
+  guest_vehiculo_modelo?: string;
+  guest_vehiculo_color?: string;
 }
 
 // ========== FUNCIONES DE RESERVAS ==========

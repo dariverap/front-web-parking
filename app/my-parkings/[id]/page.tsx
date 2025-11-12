@@ -759,7 +759,10 @@ export default function ParkingManagementPage() {
                                 const nombreUsuario = r.usuario 
                                   ? `${r.usuario.nombre} ${r.usuario.apellido}` 
                                   : (r.guest_nombre || "N/A")
-                                const placaVehiculo = r.vehiculo?.placa || "N/A"
+                                // Priorizar vehículo registrado, luego guest_vehiculo_*
+                                const placaVehiculo = r.vehiculo?.placa || r.guest_vehiculo_placa || "N/A"
+                                const marcaVehiculo = r.vehiculo?.marca || r.guest_vehiculo_marca
+                                const modeloVehiculo = r.vehiculo?.modelo || r.guest_vehiculo_modelo
                                 const numeroEspacio = r.espacio?.numero_espacio || "N/A"
                                 const horaReserva = new Date(r.hora_inicio).toLocaleString('es-PE', {
                                   day: '2-digit',
@@ -783,9 +786,9 @@ export default function ParkingManagementPage() {
                                     <TableCell>
                                       <div className="flex flex-col">
                                         <span className="font-medium">{placaVehiculo}</span>
-                                        {r.vehiculo?.marca && (
+                                        {(marcaVehiculo || modeloVehiculo) && (
                                           <span className="text-xs text-muted-foreground">
-                                            {r.vehiculo.marca} {r.vehiculo.modelo}
+                                            {marcaVehiculo} {modeloVehiculo}
                                           </span>
                                         )}
                                       </div>
@@ -876,18 +879,31 @@ export default function ParkingManagementPage() {
                               // Mostrar el botón siempre que NO exista una salida solicitada explícita
                               // Nota: monto_calculado/tiempo_total existen para ocupaciones activas y no deben ocultar el botón
                               const salidaSolicitada = !!o.hora_salida_solicitada
+                              
+                              // Priorizar datos de vehículo registrado, luego guest_vehiculo_*
+                              const placaVehiculo = o.placa || o.guest_vehiculo_placa || "N/A"
+                              const marcaVehiculo = o.marca || o.guest_vehiculo_marca
+                              const modeloVehiculo = o.modelo || o.guest_vehiculo_modelo
+                              
+                              // Determinar si es invitado: no tiene id_usuario pero sí guest_nombre
+                              const esInvitado = !o.id_usuario && !!o.guest_nombre
 
                               return (
                                 <TableRow key={o.id_ocupacion}>
                                   <TableCell className="font-medium">
-                                    {o.nombre_usuario || "N/A"}
+                                    <div className="flex items-center gap-2">
+                                      <span>{o.nombre_usuario || "Visitante"}</span>
+                                      {esInvitado && (
+                                        <Badge variant="outline" className="text-xs">Invitado</Badge>
+                                      )}
+                                    </div>
                                   </TableCell>
                                   <TableCell>
                                     <div className="flex flex-col">
-                                      <span className="font-medium">{o.placa || "N/A"}</span>
-                                      {o.marca && (
+                                      <span className="font-medium">{placaVehiculo}</span>
+                                      {(marcaVehiculo || modeloVehiculo) && (
                                         <span className="text-xs text-muted-foreground">
-                                          {o.marca} {o.modelo}
+                                          {marcaVehiculo} {modeloVehiculo}
                                         </span>
                                       )}
                                     </div>
@@ -974,18 +990,28 @@ export default function ParkingManagementPage() {
                                 const horas = Math.floor(tiempoMinutos / 60)
                                 const minutos = tiempoMinutos % 60
                                 const tiempoStr = `${horas}h ${minutos}m`
+                                
+                                // Priorizar datos de vehículo registrado, luego guest_vehiculo_*
+                                const placaVehiculo = p.placa || p.vehiculo_placa || "N/A"
+                                const marcaVehiculo = p.marca || p.vehiculo_marca
+                                const modeloVehiculo = p.modelo || p.vehiculo_modelo
 
                                 return (
                                   <TableRow key={p.id_pago}>
                                     <TableCell className="font-medium">
-                                      {p.nombre_usuario || "N/A"}
+                                      <div className="flex items-center gap-2">
+                                        <span>{p.nombre_usuario || p.guest_nombre || "Visitante"}</span>
+                                        {!p.id_usuario && p.guest_nombre && (
+                                          <Badge variant="outline" className="text-xs">Invitado</Badge>
+                                        )}
+                                      </div>
                                     </TableCell>
                                     <TableCell>
                                       <div className="flex flex-col">
-                                        <span className="font-medium">{p.placa || "N/A"}</span>
-                                        {p.marca && (
+                                        <span className="font-medium">{placaVehiculo}</span>
+                                        {(marcaVehiculo || modeloVehiculo) && (
                                           <span className="text-xs text-muted-foreground">
-                                            {p.marca} {p.modelo}
+                                            {marcaVehiculo} {modeloVehiculo}
                                           </span>
                                         )}
                                       </div>
@@ -1326,9 +1352,19 @@ export default function ParkingManagementPage() {
                               {ops.map(op => {
                                 const baseDate = op.fechas.pago_at || op.fechas.salida_at || op.fechas.entrada_at || op.fechas.hora_programada_inicio || op.fechas.creada_at || ""
                                 const fechaStr = baseDate ? new Date(baseDate).toLocaleString('es-PE', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '—'
-                                const nombre = op.usuario ? [op.usuario.nombre, op.usuario.apellido].filter(Boolean).join(' ') : '—'
-                                const placa = op.vehiculo?.placa || '—'
-                                const marcaModelo = [op.vehiculo?.marca, op.vehiculo?.modelo].filter(Boolean).join(' ')
+                                
+                                // Usuario: priorizar usuario registrado, luego guest_nombre
+                                const nombreUsuario = op.usuario 
+                                  ? [op.usuario.nombre, op.usuario.apellido].filter(Boolean).join(' ')
+                                  : (op.guest_nombre || 'Visitante')
+                                const esInvitado = !op.usuario && op.guest_nombre
+                                
+                                // Vehículo: priorizar vehículo registrado, luego guest_vehiculo_*
+                                const placa = op.vehiculo?.placa || op.guest_vehiculo_placa || '—'
+                                const marcaVehiculo = op.vehiculo?.marca || op.guest_vehiculo_marca
+                                const modeloVehiculo = op.vehiculo?.modelo || op.guest_vehiculo_modelo
+                                const marcaModelo = [marcaVehiculo, modeloVehiculo].filter(Boolean).join(' ')
+                                
                                 const espacio = op.espacio?.numero_espacio || '—'
                                 const mins = op.duracion_minutos || 0
                                 const horas = Math.floor(mins/60)
@@ -1351,7 +1387,14 @@ export default function ParkingManagementPage() {
                                         )}
                                       </div>
                                     </TableCell>
-                                    <TableCell className="font-medium">{nombre}</TableCell>
+                                    <TableCell className="font-medium">
+                                      <div className="flex items-center gap-2">
+                                        <span>{nombreUsuario}</span>
+                                        {esInvitado && (
+                                          <Badge variant="outline" className="text-xs">Invitado</Badge>
+                                        )}
+                                      </div>
+                                    </TableCell>
                                     <TableCell>
                                       <div className="flex flex-col">
                                         <span className="font-medium">{placa}</span>
@@ -1394,10 +1437,28 @@ export default function ParkingManagementPage() {
                         <div className="grid md:grid-cols-2 gap-4 text-sm">
                           <div className="space-y-2">
                             <div><span className="text-muted-foreground">Estado:</span> <Badge variant="secondary" className={colorByEstado(detalleOperacion.estado_final)}>{labelByEstado(detalleOperacion.estado_final)}</Badge></div>
-                            <div><span className="text-muted-foreground">Usuario:</span> {[detalleOperacion.usuario?.nombre, detalleOperacion.usuario?.apellido].filter(Boolean).join(' ') || '—'}</div>
+                            <div>
+                              <span className="text-muted-foreground">Usuario:</span> 
+                              {detalleOperacion.usuario 
+                                ? ` ${[detalleOperacion.usuario.nombre, detalleOperacion.usuario.apellido].filter(Boolean).join(' ')}`
+                                : (detalleOperacion.guest_nombre ? ` ${detalleOperacion.guest_nombre}` : ' —')
+                              }
+                              {!detalleOperacion.usuario && detalleOperacion.guest_nombre && (
+                                <Badge variant="outline" className="text-xs ml-2">Invitado</Badge>
+                              )}
+                            </div>
                             <div><span className="text-muted-foreground">Email:</span> {detalleOperacion.usuario?.email || '—'}</div>
-                            <div><span className="text-muted-foreground">Teléfono:</span> {detalleOperacion.usuario?.telefono || '—'}</div>
-                            <div><span className="text-muted-foreground">Vehículo:</span> {detalleOperacion.vehiculo?.placa || '—'} {detalleOperacion.vehiculo?.marca || detalleOperacion.vehiculo?.modelo ? `· ${detalleOperacion.vehiculo?.marca||''} ${detalleOperacion.vehiculo?.modelo||''}` : ''}</div>
+                            <div><span className="text-muted-foreground">Teléfono:</span> {detalleOperacion.usuario?.telefono || detalleOperacion.guest_telefono || '—'}</div>
+                            <div>
+                              <span className="text-muted-foreground">Vehículo:</span> 
+                              {(() => {
+                                const placa = detalleOperacion.vehiculo?.placa || detalleOperacion.guest_vehiculo_placa || '—'
+                                const marca = detalleOperacion.vehiculo?.marca || detalleOperacion.guest_vehiculo_marca || ''
+                                const modelo = detalleOperacion.vehiculo?.modelo || detalleOperacion.guest_vehiculo_modelo || ''
+                                const marcaModelo = [marca, modelo].filter(Boolean).join(' ')
+                                return ` ${placa}${marcaModelo ? ` · ${marcaModelo}` : ''}`
+                              })()}
+                            </div>
                             <div><span className="text-muted-foreground">Espacio:</span> {detalleOperacion.espacio?.numero_espacio || '—'}</div>
                             <div><span className="text-muted-foreground">Programado:</span> {detalleOperacion.fechas.hora_programada_inicio ? new Date(detalleOperacion.fechas.hora_programada_inicio).toLocaleString('es-PE') : '—'}{detalleOperacion.fechas.hora_programada_fin ? ` → ${new Date(detalleOperacion.fechas.hora_programada_fin).toLocaleString('es-PE')}` : ''}</div>
                             <div><span className="text-muted-foreground">Entrada:</span> {detalleOperacion.fechas.entrada_at ? new Date(detalleOperacion.fechas.entrada_at).toLocaleString('es-PE') : '—'}</div>

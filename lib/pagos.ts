@@ -9,11 +9,21 @@ export interface PagoPendiente {
   created_at: string;
   // Datos relacionados desde ocupacion
   nombre_usuario?: string;
+  placa?: string;
+  marca?: string;
+  modelo?: string;
   vehiculo_placa?: string;
   numero_espacio?: string;
   hora_entrada?: string;
   hora_salida_solicitada?: string;
   tiempo_total_minutos?: number;
+  // Campos de invitado (persona)
+  guest_nombre?: string;
+  guest_documento?: string;
+  guest_telefono?: string;
+  // Campos de vehículo invitado
+  vehiculo_marca?: string;
+  vehiculo_modelo?: string;
 }
 
 export interface PagoRecord {

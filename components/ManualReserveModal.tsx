@@ -46,6 +46,10 @@ export default function ManualReserveModal({
     guest_nombre: "",
     guest_documento: "",
     guest_telefono: "",
+    guest_vehiculo_placa: "",
+    guest_vehiculo_marca: "",
+    guest_vehiculo_modelo: "",
+    guest_vehiculo_color: "",
     id_espacio: "",
     id_tarifa: "",
     marcar_entrada: true // Por defecto crear ocupación inmediata
@@ -101,6 +105,10 @@ export default function ManualReserveModal({
         guest_nombre: formData.guest_nombre.trim(),
         guest_documento: formData.guest_documento.trim() || undefined,
         guest_telefono: formData.guest_telefono.trim() || undefined,
+        guest_vehiculo_placa: formData.guest_vehiculo_placa.trim() || undefined,
+        guest_vehiculo_marca: formData.guest_vehiculo_marca.trim() || undefined,
+        guest_vehiculo_modelo: formData.guest_vehiculo_modelo.trim() || undefined,
+        guest_vehiculo_color: formData.guest_vehiculo_color.trim() || undefined,
         marcar_entrada: formData.marcar_entrada
       }
 
@@ -138,6 +146,10 @@ export default function ManualReserveModal({
       guest_nombre: "",
       guest_documento: "",
       guest_telefono: "",
+      guest_vehiculo_placa: "",
+      guest_vehiculo_marca: "",
+      guest_vehiculo_modelo: "",
+      guest_vehiculo_color: "",
       id_espacio: "",
       id_tarifa: "",
       marcar_entrada: true
@@ -204,6 +216,60 @@ export default function ManualReserveModal({
               onChange={(e) => setFormData({ ...formData, guest_telefono: e.target.value })}
               disabled={loading}
             />
+          </div>
+
+          {/* Separador de vehículo */}
+          <div className="border-t pt-4">
+            <p className="text-sm font-medium text-muted-foreground mb-3">Datos del Vehículo (opcional)</p>
+            
+            {/* Placa del vehículo */}
+            <div className="space-y-2 mb-3">
+              <Label htmlFor="guest_vehiculo_placa">Placa</Label>
+              <Input
+                id="guest_vehiculo_placa"
+                placeholder="Ej: ABC-123"
+                value={formData.guest_vehiculo_placa}
+                onChange={(e) => setFormData({ ...formData, guest_vehiculo_placa: e.target.value.toUpperCase() })}
+                disabled={loading}
+                maxLength={10}
+              />
+            </div>
+
+            {/* Marca y Modelo en grid */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="space-y-2">
+                <Label htmlFor="guest_vehiculo_marca">Marca</Label>
+                <Input
+                  id="guest_vehiculo_marca"
+                  placeholder="Ej: Toyota"
+                  value={formData.guest_vehiculo_marca}
+                  onChange={(e) => setFormData({ ...formData, guest_vehiculo_marca: e.target.value })}
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="guest_vehiculo_modelo">Modelo</Label>
+                <Input
+                  id="guest_vehiculo_modelo"
+                  placeholder="Ej: Corolla"
+                  value={formData.guest_vehiculo_modelo}
+                  onChange={(e) => setFormData({ ...formData, guest_vehiculo_modelo: e.target.value })}
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Color */}
+            <div className="space-y-2">
+              <Label htmlFor="guest_vehiculo_color">Color</Label>
+              <Input
+                id="guest_vehiculo_color"
+                placeholder="Ej: Rojo"
+                value={formData.guest_vehiculo_color}
+                onChange={(e) => setFormData({ ...formData, guest_vehiculo_color: e.target.value })}
+                disabled={loading}
+              />
+            </div>
           </div>
 
           {/* Espacio */}

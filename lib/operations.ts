@@ -28,6 +28,10 @@ export type OperationRecord = {
     email?: string;
     telefono?: string;
   } | null;
+  // Campos de invitado (persona)
+  guest_nombre?: string | null;
+  guest_documento?: string | null;
+  guest_telefono?: string | null;
   vehiculo?: {
     id_vehiculo?: string;
     placa?: string;
@@ -35,6 +39,11 @@ export type OperationRecord = {
     modelo?: string;
     color?: string;
   } | null;
+  // Campos de vehículo invitado
+  guest_vehiculo_placa?: string | null;
+  guest_vehiculo_marca?: string | null;
+  guest_vehiculo_modelo?: string | null;
+  guest_vehiculo_color?: string | null;
   espacio?: {
     id_espacio?: string;
     numero_espacio?: string;
