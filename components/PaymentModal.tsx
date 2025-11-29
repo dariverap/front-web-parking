@@ -35,6 +35,8 @@ interface PaymentModalProps {
     hora_entrada?: string
     monto_calculado?: number
     tiempo_total?: number
+    guest_nombre?: string
+    guest_documento?: string
   }
   onSuccess: () => void
 }
@@ -53,6 +55,8 @@ export default function PaymentModal({
   const [metodosPago, setMetodosPago] = useState<MetodoPago[]>([])
   const [selectedMetodo, setSelectedMetodo] = useState<string>('')
   const [tipoComprobante, setTipoComprobante] = useState<'boleta' | 'factura'>('boleta')
+  const [clienteRuc, setClienteRuc] = useState<string>('')
+  const [clienteDni, setClienteDni] = useState<string>('')
   const [montoRecibido, setMontoRecibido] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [loadingMetodos, setLoadingMetodos] = useState(true)
@@ -156,13 +160,36 @@ export default function PaymentModal({
       setSelectedMetodo('')
       setMontoRecibido('')
       setTipoComprobante('boleta')
+      setClienteRuc('')
+      // Precargar DNI si hay guest_documento (invitado)
+      setClienteDni(ocupacion.guest_documento || '')
     }
-  }, [isOpen])
+  }, [isOpen, ocupacion.guest_documento])
 
   const handleSubmit = async () => {
     if (!selectedMetodo) {
       alert('Por favor selecciona un método de pago')
       return
+    }
+
+    // Validar RUC para facturas
+    if (tipoComprobante === 'factura') {
+      if (!clienteRuc.trim()) {
+        alert('El RUC es obligatorio para facturas')
+        return
+      }
+      if (clienteRuc.trim().length !== 11) {
+        alert('El RUC debe tener 11 dígitos')
+        return
+      }
+    }
+
+    // Validar DNI para boletas (opcional pero si se ingresa debe ser válido)
+    if (tipoComprobante === 'boleta' && clienteDni.trim()) {
+      if (clienteDni.trim().length !== 8) {
+        alert('El DNI debe tener 8 dígitos')
+        return
+      }
     }
 
     if (esEfectivo && !montoRecibido) {
@@ -182,11 +209,23 @@ export default function PaymentModal({
         id_ocupacion: number
         id_metodo: number
         tipo_comprobante: string
+        cliente_ruc?: string
+        cliente_dni?: string
         monto_recibido?: number
       } = {
         id_ocupacion: ocupacion.id_ocupacion,
         id_metodo: parseInt(selectedMetodo),
         tipo_comprobante: tipoComprobante,
+      }
+
+      // Agregar RUC para facturas
+      if (tipoComprobante === 'factura' && clienteRuc.trim()) {
+        payload.cliente_ruc = clienteRuc.trim()
+      }
+
+      // Agregar DNI para boletas (opcional, si el usuario lo ingresó)
+      if (tipoComprobante === 'boleta' && clienteDni.trim()) {
+        payload.cliente_dni = clienteDni.trim()
       }
 
       if (esEfectivo) {
@@ -345,6 +384,44 @@ export default function PaymentModal({
               </SelectContent>
             </Select>
           </div>
+
+          {/* RUC del cliente (solo para facturas) */}
+          {tipoComprobante === 'factura' && (
+            <div className="grid gap-2">
+              <Label htmlFor="ruc">RUC (11 dígitos) *</Label>
+              <Input
+                id="ruc"
+                type="text"
+                placeholder="20123456789"
+                value={clienteRuc}
+                onChange={(e) => setClienteRuc(e.target.value)}
+                maxLength={11}
+                pattern="[0-9]*"
+              />
+              <p className="text-xs text-muted-foreground">
+                Requerido para emitir factura
+              </p>
+            </div>
+          )}
+
+          {/* DNI del cliente (opcional para boletas) */}
+          {tipoComprobante === 'boleta' && (
+            <div className="grid gap-2">
+              <Label htmlFor="dni">DNI (8 dígitos) - Opcional</Label>
+              <Input
+                id="dni"
+                type="text"
+                placeholder="12345678"
+                value={clienteDni}
+                onChange={(e) => setClienteDni(e.target.value)}
+                maxLength={8}
+                pattern="[0-9]*"
+              />
+              <p className="text-xs text-muted-foreground">
+                Solo si el cliente no lo tiene registrado. Puedes dejarlo vacío.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

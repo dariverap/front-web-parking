@@ -46,6 +46,7 @@ export default function ManualReserveModal({
     guest_nombre: "",
     guest_documento: "",
     guest_telefono: "",
+    guest_email: "",
     guest_vehiculo_placa: "",
     guest_vehiculo_marca: "",
     guest_vehiculo_modelo: "",
@@ -105,6 +106,7 @@ export default function ManualReserveModal({
         guest_nombre: formData.guest_nombre.trim(),
         guest_documento: formData.guest_documento.trim() || undefined,
         guest_telefono: formData.guest_telefono.trim() || undefined,
+        guest_email: formData.guest_email.trim() || undefined,
         guest_vehiculo_placa: formData.guest_vehiculo_placa.trim() || undefined,
         guest_vehiculo_marca: formData.guest_vehiculo_marca.trim() || undefined,
         guest_vehiculo_modelo: formData.guest_vehiculo_modelo.trim() || undefined,
@@ -146,6 +148,7 @@ export default function ManualReserveModal({
       guest_nombre: "",
       guest_documento: "",
       guest_telefono: "",
+      guest_email: "",
       guest_vehiculo_placa: "",
       guest_vehiculo_marca: "",
       guest_vehiculo_modelo: "",
@@ -216,6 +219,22 @@ export default function ManualReserveModal({
               onChange={(e) => setFormData({ ...formData, guest_telefono: e.target.value })}
               disabled={loading}
             />
+          </div>
+
+          {/* Email */}
+          <div className="space-y-2">
+            <Label htmlFor="guest_email">Email (opcional)</Label>
+            <Input
+              id="guest_email"
+              type="email"
+              placeholder="Ej: cliente@ejemplo.com"
+              value={formData.guest_email}
+              onChange={(e) => setFormData({ ...formData, guest_email: e.target.value })}
+              disabled={loading}
+            />
+            <p className="text-xs text-muted-foreground">
+              Se enviará el comprobante de pago a este email
+            </p>
           </div>
 
           {/* Separador de vehículo */}

@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ClipboardList, Car, ParkingCircle, DollarSign, Percent, Clock, Plus, Edit, Trash2, RefreshCcw, Lock, Unlock, CheckCircle2, AlertCircle, X, LogOut, Eye, Banknote, Smartphone, CreditCard } from "lucide-react"
+import { ClipboardList, Car, ParkingCircle, DollarSign, Percent, Clock, Plus, Edit, Trash2, RefreshCcw, Lock, Unlock, CheckCircle2, AlertCircle, X, LogOut, Eye, Banknote, Smartphone, CreditCard, Download } from "lucide-react"
 import { listTarifasByParking, createTarifa, updateTarifa, deleteTarifa, type TarifaRecord } from "@/lib/tarifas"
 import { listSpacesByParking, toggleSpaceEnabled, type SpaceRecord } from "@/lib/spaces"
 import { listReservasByParking, listOcupacionesActivas, listHistorialOcupaciones, confirmarEntrada, registrarSalida, type ReservaRecord, type OcupacionRecord } from "@/lib/reservas"
@@ -113,6 +113,9 @@ export default function ParkingManagementPage() {
 
   // ========== MANUAL RESERVE MODAL STATE ==========
   const [isManualReserveModalOpen, setIsManualReserveModalOpen] = useState(false)
+
+  // ========== COMPROBANTES ==========
+  const [descargandoComprobante, setDescargandoComprobante] = useState(false)
 
   // ========== STATISTICS ==========
   const [stats, setStats] = useState({
@@ -460,6 +463,57 @@ export default function ParkingManagementPage() {
       setOpsLoading(false)
     }
   }, [parkingId, estadoFiltro, fechaDesde, fechaHasta, historialQuery])
+
+  // ========== COMPROBANTES HANDLERS ==========
+  const descargarComprobante = async (idPago: number) => {
+    setDescargandoComprobante(true)
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) {
+        alert('No se encontró token de autenticación. Por favor inicia sesión nuevamente.')
+        return
+      }
+      
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/comprobantes/descargar/${idPago}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          alert('Sesión expirada. Por favor inicia sesión nuevamente.')
+          return
+        }
+        throw new Error('Error al descargar comprobante')
+      }
+      
+      // Obtener el nombre del archivo del header Content-Disposition
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'comprobante.pdf'
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="?(.+)"?/)
+        if (match) filename = match[1]
+      }
+      
+      // Descargar el PDF
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      
+    } catch (error) {
+      console.error('Error descargando comprobante:', error)
+      alert('Error al descargar el comprobante. Por favor intente nuevamente.')
+    } finally {
+      setDescargandoComprobante(false)
+    }
+  }
 
   // Estados disponibles - lista completa fija de todos los estados posibles
   const estadosDisponibles = useMemo(() => {
@@ -887,12 +941,15 @@ export default function ParkingManagementPage() {
                               
                               // Determinar si es invitado: no tiene id_usuario pero sí guest_nombre
                               const esInvitado = !o.id_usuario && !!o.guest_nombre
+                              
+                              // Nombre: priorizar guest_nombre para invitados, luego nombre_usuario
+                              const nombreMostrar = o.guest_nombre || o.nombre_usuario || "Visitante"
 
                               return (
                                 <TableRow key={o.id_ocupacion}>
                                   <TableCell className="font-medium">
                                     <div className="flex items-center gap-2">
-                                      <span>{o.nombre_usuario || "Visitante"}</span>
+                                      <span>{nombreMostrar}</span>
                                       {esInvitado && (
                                         <Badge variant="outline" className="text-xs">Invitado</Badge>
                                       )}
@@ -1482,6 +1539,21 @@ export default function ParkingManagementPage() {
                             <div><span className="text-muted-foreground">Tipo:</span> {detalleOperacion.pago?.comprobante?.tipo || '—'}</div>
                             <div><span className="text-muted-foreground">Serie:</span> {detalleOperacion.pago?.comprobante?.serie || '—'}</div>
                             <div><span className="text-muted-foreground">Número:</span> {detalleOperacion.pago?.comprobante?.numero ?? '—'}</div>
+                            
+                            {/* Botón para descargar comprobante */}
+                            {detalleOperacion.pago?.id_pago && detalleOperacion.pago?.estado?.toUpperCase() === 'COMPLETADO' && (
+                              <div className="mt-4">
+                                <Button 
+                                  onClick={() => descargarComprobante(detalleOperacion.pago!.id_pago)}
+                                  disabled={descargandoComprobante}
+                                  className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  {descargandoComprobante ? 'Descargando...' : 'Descargar Comprobante PDF'}
+                                </Button>
+                              </div>
+                            )}
+                            
                             <div className="mt-3">
                               <div className="font-medium mb-1 flex items-center gap-1"><Clock className="h-4 w-4" /> Línea de tiempo</div>
                               <div className="space-y-1">
