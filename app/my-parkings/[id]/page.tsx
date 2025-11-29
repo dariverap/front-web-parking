@@ -24,10 +24,12 @@ import PaymentModal from "@/components/PaymentModal"
 import ManualReserveModal from "@/components/ManualReserveModal"
 import EmptyState from "@/components/EmptyState"
 import LoadingSpinner from "@/components/LoadingSpinner"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ParkingManagementPage() {
   const params = useParams()
   const parkingId = params?.id as string | undefined
+  const { toast } = useToast()
   
   console.log('[ParkingManagementPage] Component loaded with parkingId:', parkingId, 'params:', params)
 
@@ -341,6 +343,13 @@ export default function ParkingManagementPage() {
   }
 
   const handlePaymentSuccess = async () => {
+    // Mostrar mensaje de éxito
+    toast({
+      title: "✅ Pago procesado exitosamente",
+      description: "El comprobante ha sido generado y enviado por email al cliente.",
+      variant: "default",
+    })
+    
     // Recargar datos después de procesar el pago
     await Promise.all([
       reloadReservas(),
