@@ -104,10 +104,17 @@ export default function ParkingManagementPage() {
   const [opsLoading, setOpsLoading] = useState(false)
   const [opsError, setOpsError] = useState<string>("")
   const [historialQuery, setHistorialQuery] = useState("")
-  const [fechaDesde, setFechaDesde] = useState("") // yyyy-mm-dd
-  const [fechaHasta, setFechaHasta] = useState("") // yyyy-mm-dd
+  const [historialQueryDebounced, setHistorialQueryDebounced] = useState("")
   const [estadoFiltro, setEstadoFiltro] = useState<string>("")
   const [detalleOperacion, setDetalleOperacion] = useState<OperationRecord | null>(null)
+
+  // Debounce para búsqueda de historial (300ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setHistorialQueryDebounced(historialQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [historialQuery])
 
   // ========== PAYMENT MODAL STATE ==========
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
@@ -459,19 +466,35 @@ export default function ParkingManagementPage() {
     setOpsError("")
     try {
       const filters: any = {}
-      if (estadoFiltro) filters.estado = estadoFiltro
-      if (fechaDesde) filters.fecha_desde = fechaDesde
-      if (fechaHasta) filters.fecha_hasta = fechaHasta
-      if (historialQuery) filters.q = historialQuery
+      if (historialQueryDebounced) filters.q = historialQueryDebounced
 
       const data = await listOperationsForParking(parkingId, filters)
-      setOps(data)
+      
+      // Filtrar por estado en el frontend para agrupar correctamente
+      let filtered = data
+      if (estadoFiltro) {
+        filtered = data.filter(op => {
+          const estado = op.estado_final.toLowerCase()
+          if (estadoFiltro === 'finalizada_pagada') {
+            return estado === 'finalizada_pagada'
+          }
+          if (estadoFiltro === 'pendiente') {
+            return estado === 'pendiente' || estado === 'finalizada'
+          }
+          if (estadoFiltro === 'activa') {
+            return estado === 'activa' || estado === 'confirmada'
+          }
+          return true
+        })
+      }
+      
+      setOps(filtered)
     } catch (e: any) {
       setOpsError(e?.message || "Error al cargar historial de operaciones")
     } finally {
       setOpsLoading(false)
     }
-  }, [parkingId, estadoFiltro, fechaDesde, fechaHasta, historialQuery])
+  }, [parkingId, estadoFiltro, historialQueryDebounced])
 
   // ========== COMPROBANTES HANDLERS ==========
   const descargarComprobante = async (idPago: number) => {
@@ -524,17 +547,12 @@ export default function ParkingManagementPage() {
     }
   }
 
-  // Estados disponibles - lista completa fija de todos los estados posibles
+  // Estados disponibles - solo los 3 estados principales
   const estadosDisponibles = useMemo(() => {
     return [
-      'pendiente',
-      'confirmada',
-      'activa',
-      'finalizada',
-      'finalizada_pagada',
-      'cancelada',
-      'expirada',
-      'no_show'
+      'finalizada_pagada',  // Pagada
+      'pendiente',          // Pendiente (incluye finalizada sin pago)
+      'activa',             // En Curso (incluye confirmada)
     ]
   }, [])
 
@@ -554,10 +572,10 @@ export default function ParkingManagementPage() {
   const labelByEstado = (s: string) => {
     const up = s.toLowerCase()
     if (up === "finalizada_pagada") return "Pagada"
-    if (up === "finalizada") return "Finalizada"
-    if (up === "activa") return "En curso"
+    if (up === "finalizada") return "Pendiente"  // Finalizada sin pago = Pendiente
+    if (up === "activa") return "En Curso"
     if (up === "pendiente") return "Pendiente"
-    if (up === "confirmada") return "Confirmada"
+    if (up === "confirmada") return "En Curso"    // Confirmada = En Curso
     if (up === "cancelada") return "Cancelada"
     if (up === "expirada") return "Expirada"
     if (up === "no_show") return "No asistió"
@@ -635,14 +653,33 @@ export default function ParkingManagementPage() {
         setOpsLoading(true)
         setOpsError("")
         try {
+          // Cargar todos los datos sin filtros del backend
           const filters: any = {}
-          if (estadoFiltro) filters.estado = estadoFiltro
-          if (fechaDesde) filters.fecha_desde = fechaDesde
-          if (fechaHasta) filters.fecha_hasta = fechaHasta
-          if (historialQuery) filters.q = historialQuery
+          if (historialQueryDebounced) filters.q = historialQueryDebounced
 
           const data = await listOperationsForParking(parkingId, filters)
-          setOps(data)
+          
+          // Filtrar por estado en el frontend para agrupar correctamente
+          let filtered = data
+          if (estadoFiltro) {
+            filtered = data.filter(op => {
+              const estado = op.estado_final.toLowerCase()
+              if (estadoFiltro === 'finalizada_pagada') {
+                return estado === 'finalizada_pagada'
+              }
+              if (estadoFiltro === 'pendiente') {
+                // Pendiente incluye: pendiente y finalizada (sin pago)
+                return estado === 'pendiente' || estado === 'finalizada'
+              }
+              if (estadoFiltro === 'activa') {
+                // En Curso incluye: activa y confirmada
+                return estado === 'activa' || estado === 'confirmada'
+              }
+              return true
+            })
+          }
+          
+          setOps(filtered)
         } catch (e: any) {
           setOpsError(e?.message || "Error al cargar historial de operaciones")
         } finally {
@@ -651,7 +688,7 @@ export default function ParkingManagementPage() {
       }
       void reload()
     }
-  }, [parkingId, estadoFiltro, fechaDesde, fechaHasta, historialQuery])
+  }, [parkingId, estadoFiltro, historialQueryDebounced])
 
   const breadcrumbs = [
     { label: "Inicio", href: "/" },
@@ -1348,23 +1385,10 @@ export default function ParkingManagementPage() {
                       </CardTitle>
                       <div className="flex items-center gap-2">
                         <Input 
-                          className="w-48" 
-                          placeholder="Buscar (usuario, placa)" 
+                          className="w-56" 
+                          placeholder="Buscar por nombre, placa..." 
                           value={historialQuery} 
                           onChange={e => setHistorialQuery(e.target.value)} 
-                        />
-                        <Input 
-                          type="date" 
-                          value={fechaDesde} 
-                          onChange={e => setFechaDesde(e.target.value)} 
-                          className="w-auto"
-                        />
-                        <span className="text-sm text-muted-foreground">a</span>
-                        <Input 
-                          type="date" 
-                          value={fechaHasta} 
-                          onChange={e => setFechaHasta(e.target.value)} 
-                          className="w-auto"
                         />
                         <Select value={estadoFiltro || "all"} onValueChange={(val) => setEstadoFiltro(val === "all" ? "" : val)}>
                           <SelectTrigger className="w-[180px]">
