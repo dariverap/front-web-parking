@@ -73,7 +73,7 @@ export default function AboutPage() {
                   comprobantes electrónicos de manera automática.
                 </p>
                 <p className="text-muted-foreground leading-relaxed text-sm">
-                  Proyecto universitario desarrollado para el curso Integrador I, bajo la guía de la profesora 
+                  Proyecto universitario desarrollado para el curso Integrador II, bajo la guía de la profesora 
                   Claudia Yolanda Villalta Flores, aplicando la metodología Scrum.
                 </p>
               </CardContent>
